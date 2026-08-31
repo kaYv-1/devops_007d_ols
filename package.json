@@ -1,0 +1,11 @@
+{
+  "name": "micro-demo",
+  "version": "1.0.0",
+  "description": "Microservicio de prueba para Evaluacion Parcial 1 - Ingenieria DevOps",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/basic.test.js"
+  },
+  "license": "MIT"
+}
