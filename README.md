@@ -5,7 +5,7 @@ Microservicio base y flujo de trabajo Git/GitHub para la Evaluación Parcial N°
 ## Integrantes
 
 - Nombre Apellido 1 — GitHub: kaYv-1
-- Nombre Apellido 2 — GitHub: usuario-companero
+- Nombre Apellido 2 — GitHub: kaliyx
 
 ## 1. Sobre el proyecto
 
