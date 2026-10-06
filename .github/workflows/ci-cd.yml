@@ -1,0 +1,209 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: write
+  packages: write
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with quality gate
+        run: npm test
+
+      - name: Upload HTML test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: reports/test-report.html
+          if-no-files-found: warn
+
+  security:
+    name: security
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify Snyk token is configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN is required for security analysis." >&2
+            exit 1
+          fi
+
+      - name: Snyk dependency scan
+        uses: snyk/actions/node@master
+        continue-on-error: false
+        with:
+          args: --severity-threshold=high --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk code scan
+        uses: snyk/actions/node@master
+        with:
+          command: code test
+          args: --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          scan-type: fs
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  build-scan-push:
+    name: build-scan-push
+    needs: security
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image with OCI labels
+        env:
+          OWNER_LC: ${{ github.repository_owner }}
+          REPOSITORY_LC: ${{ github.event.repository.name }}
+        run: |
+          OWNER_LC="$(echo "$OWNER_LC" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY_LC="$(echo "$REPOSITORY_LC" | tr '[:upper:]' '[:lower:]')"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_REF="ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${SHORT_SHA}"
+          echo "IMAGE_REF=${IMAGE_REF}" >> "$GITHUB_ENV"
+          docker buildx build \
+            --platform linux/amd64 \
+            --load \
+            -t "${IMAGE_REF}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            .
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push image to GHCR
+        env:
+          OWNER_LC: ${{ github.repository_owner }}
+          REPOSITORY_LC: ${{ github.event.repository.name }}
+        run: |
+          OWNER_LC="$(echo "$OWNER_LC" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY_LC="$(echo "$REPOSITORY_LC" | tr '[:upper:]' '[:lower:]')"
+          docker push "ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${GITHUB_SHA::7}"
+
+  deploy:
+    name: deploy
+    needs: build-scan-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: staging
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare deployment environment
+        env:
+          OWNER_LC: ${{ github.repository_owner }}
+          REPOSITORY_LC: ${{ github.event.repository.name }}
+        run: |
+          OWNER_LC="$(echo "$OWNER_LC" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY_LC="$(echo "$REPOSITORY_LC" | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "PORT=3000"
+            echo "NODE_ENV=production"
+            echo "IMAGE_NAME=ghcr.io/${OWNER_LC}/${REPOSITORY_LC}"
+            echo "IMAGE_TAG=${GITHUB_SHA::7}"
+            echo "NGINX_PORT=8080"
+            echo "APP_REPLICAS=3"
+          } > .env
+
+      - name: Pull and deploy the scanned commit image
+        run: |
+          docker compose pull app
+          docker compose up -d --no-build --scale app=3
+
+      - name: Smoke test
+        run: curl --fail --silent http://localhost:8080/health
+
+      - name: Show compose status
+        run: docker compose ps
+
+  alert:
+    name: alert
+    if: failure()
+    needs: [test, security, build-scan-push, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open issue on pipeline failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Pipeline failure for ${context.sha.substring(0, 7)}`,
+              body: `The CI/CD workflow failed for commit ${context.sha}. Please review the failed job logs and remediate the problem.`
+            });

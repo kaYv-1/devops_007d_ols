@@ -1,0 +1,79 @@
+name: devops-007d-ols
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-devops-007d-ols}:${IMAGE_TAG:-latest}
+    environment:
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-production}
+    expose:
+      - "${PORT:-3000}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:${PORT:-3000}/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: "0.5"
+    deploy:
+      replicas: ${APP_REPLICAS:-3}
+
+  nginx:
+    image: nginx:1.27-alpine
+    user: "101:101"
+    ports:
+      - "${NGINX_PORT:-8080}:8080"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx:mode=1777
+      - /var/run:mode=1777
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.25"
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-devops-007d-ols}-tests:${IMAGE_TAG:-latest}
+    command: ["node", "scripts/run-tests.js"]
+    user: "${TEST_UID:-1000}:${TEST_GID:-1000}"
+    environment:
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-test}
+    working_dir: /app
+    volumes:
+      - ./reports:/app/reports
+    tmpfs:
+      - /app/coverage:mode=1777
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.75"

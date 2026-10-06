@@ -1,19 +1,29 @@
 const http = require('http');
 
-const PORT = process.env.PORT || 3000;
+const rawPort = Number(process.env.PORT);
+const PORT = Number.isInteger(rawPort) && rawPort > 0 ? rawPort : 3000;
 
 function sum(a, b) {
-  return a + b;
+  const left = Number(a);
+  const right = Number(b);
+
+  if (!Number.isFinite(left) || !Number.isFinite(right)) {
+    throw new TypeError('sum expects finite numeric values');
+  }
+
+  return left + right;
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
+  const pathname = new URL(req.url, 'http://localhost').pathname;
+
+  if (pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok' }));
     return;
   }
 
-  if (req.url === '/') {
+  if (pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'micro-demo funcionando' }));
     return;
