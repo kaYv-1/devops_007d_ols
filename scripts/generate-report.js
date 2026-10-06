@@ -8,7 +8,7 @@ const outputFile = path.join(reportsDir, 'test-report.html');
 
 fs.mkdirSync(reportsDir, { recursive: true });
 
-const testResult = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'test/*.js'], {
+const testResult = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'test/basic.test.js'], {
   cwd: root,
   encoding: 'utf8',
 });

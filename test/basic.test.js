@@ -19,53 +19,50 @@ test('sum rechaza entradas no numericas', () => {
   assert.throws(() => sum('abc', 2), /finite numeric values/);
 });
 
-test('servidor maneja rutas con query strings', async () => {
+test('GET /health devuelve 200 y estado ok', async () => {
+  await withServer(async (port) => {
+    const response = await getResponse(port, '/health?check=1');
+
+    assert.strictEqual(response.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(response.body), { status: 'ok' });
+  });
+});
+
+test('GET / devuelve 200 y el mensaje esperado', async () => {
+  await withServer(async (port) => {
+    const response = await getResponse(port, '/?name=alice');
+
+    assert.strictEqual(response.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(response.body), { message: 'micro-demo funcionando' });
+  });
+});
+
+test('GET a una ruta inexistente devuelve 404', async () => {
+  await withServer(async (port) => {
+    const response = await getResponse(port, '/missing-path');
+
+    assert.strictEqual(response.statusCode, 404);
+    assert.deepStrictEqual(JSON.parse(response.body), { error: 'not found' });
+  });
+});
+
+async function withServer(run) {
   await new Promise((resolve) => server.listen(0, resolve));
   const { port } = server.address();
 
   try {
-    const healthResponse = await new Promise((resolve, reject) => {
-      http.get(`http://localhost:${port}/health?check=1`, (res) => {
-        let body = '';
-        res.on('data', (chunk) => { body += chunk; });
-        res.on('end', () => resolve({ statusCode: res.statusCode, body }));
-      }).on('error', reject);
-    });
-
-    assert.strictEqual(healthResponse.statusCode, 200);
-    assert.deepStrictEqual(JSON.parse(healthResponse.body), { status: 'ok' });
-
-    const rootResponse = await new Promise((resolve, reject) => {
-      http.get(`http://localhost:${port}/?name=alice`, (res) => {
-        let body = '';
-        res.on('data', (chunk) => { body += chunk; });
-        res.on('end', () => resolve({ statusCode: res.statusCode, body }));
-      }).on('error', reject);
-    });
-
-    assert.strictEqual(rootResponse.statusCode, 200);
-    assert.deepStrictEqual(JSON.parse(rootResponse.body), { message: 'micro-demo funcionando' });
+    await run(port);
   } finally {
     await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
   }
-});
+}
 
-test('servidor devuelve 404 para rutas inexistentes', async () => {
-  await new Promise((resolve) => server.listen(0, resolve));
-  const { port } = server.address();
-
-  try {
-    const missingResponse = await new Promise((resolve, reject) => {
-      http.get(`http://localhost:${port}/missing-path`, (res) => {
-        let body = '';
-        res.on('data', (chunk) => { body += chunk; });
-        res.on('end', () => resolve({ statusCode: res.statusCode, body }));
-      }).on('error', reject);
-    });
-
-    assert.strictEqual(missingResponse.statusCode, 404);
-    assert.deepStrictEqual(JSON.parse(missingResponse.body), { error: 'not found' });
-  } finally {
-    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
-  }
-});
+function getResponse(port, pathname) {
+  return new Promise((resolve, reject) => {
+    http.get(`http://localhost:${port}${pathname}`, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, body }));
+    }).on('error', reject);
+  });
+}

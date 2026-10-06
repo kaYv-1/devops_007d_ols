@@ -18,16 +18,23 @@ flowchart LR
     C --> D[Build + Scan + Push]
     D --> E[Deploy staging]
     E --> F[Smoke test]
-    C --> G[Alert issue on failure]
+    B -. failure .-> G[Alert issue]
+    C -. failure .-> G
+    D -. failure .-> G
+    E -. failure .-> G
 ```
 
 ## Explicación de cada job y qué indicador cubre
 
-- `test`: ejecuta las pruebas unitarias del microservicio, valida la calidad mínima y genera el reporte HTML. Cubre IE2.
-- `security`: ejecuta análisis de dependencias con Snyk y escaneo de vulnerabilidades con Trivy. Cubre IE3.
-- `build-scan-push`: en push a `main`, compila la imagen Docker con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto. Cubre IE4.
-- `deploy`: en push a `main`, descarga y despliega con Docker Compose esa misma etiqueta en staging, y ejecuta un smoke test con curl. Cubre IE4.
-- `alert`: abre un issue automático si cualquiera de los jobs previos falla. Cubre IE3.
+- `test`: se ejecuta en cada push y pull request contra `main`; corre `node:test`, exige cobertura de líneas mínima de 80% y publica el reporte HTML. Cubre IE2 / IL2.2.
+- `security`: depende de `test`; ejecuta Snyk para dependencias y código, además de Trivy para el filesystem. Las vulnerabilidades `HIGH` o `CRITICAL` fallan el job y bloquean los siguientes. Cubre IE3 / IL2.3.
+- `build-scan-push`: solo en push a `main`, construye la imagen, agrega etiquetas OCI, escanea con Trivy y luego publica en GHCR usando el SHA corto. Cubre IE1 / IL2.1 e IE4 / IL2.4.
+- `deploy`: solo en push a `main` y después de la publicación, descarga esa misma imagen etiquetada y la despliega en el entorno GitHub `staging` con Compose; finaliza con un smoke test curl con reintentos. Cubre IE4 / IL2.4 e IE5 / IL2.5.
+- `alert`: crea un issue automáticamente cuando falla un job previo. Cubre IE3 / IL2.3.
+
+Este pipeline está definido en un único workflow, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml). El workflow antiguo de CI se retiró para evitar ejecuciones redundantes con Node 18 y dejar un único conjunto de checks requerido.
+
+Los indicadores del documento de evaluación se identifican como IL2.1–IL2.5; se relacionan aquí con IE1–IE5 para mantener también la nomenclatura usada en las instrucciones del encargo.
 
 ## Relación de los 10 pasos del profesor con los archivos del repo
 

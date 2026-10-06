@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  packages: write
 
 jobs:
   test:
@@ -82,7 +80,6 @@ jobs:
           scan-type: fs
           format: table
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: '1'
 
   build-scan-push:
@@ -128,7 +125,6 @@ jobs:
           image-ref: ${{ env.IMAGE_REF }}
           format: table
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
           exit-code: '1'
 
       - name: Push image to GHCR
@@ -183,7 +179,15 @@ jobs:
           docker compose up -d --no-build --scale app=3
 
       - name: Smoke test
-        run: curl --fail --silent http://localhost:8080/health
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://localhost:8080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Staging smoke test failed after 40 seconds." >&2
+          exit 1
 
       - name: Show compose status
         run: docker compose ps

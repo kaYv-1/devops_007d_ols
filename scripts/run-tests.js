@@ -18,7 +18,7 @@ const testCommand = [
   '--test',
   '--experimental-test-coverage',
   '--test-reporter=tap',
-  'test/*.js',
+  'test/basic.test.js',
 ];
 
 const testResult = spawnSync(process.execPath, testCommand, {
@@ -63,7 +63,7 @@ if ((testResult.status ?? 0) !== 0 || (reportResult.status ?? 0) !== 0 || failed
 console.log(`Reporte HTML generado en ${path.join(reportsDir, 'test-report.html')}`);
 
 function calculateCoveragePercent(output) {
-  const match = output.match(/# all files \|\s+([\d.]+)\s+\|/i);
+  const match = output.match(/^#\s*all files\s*\|\s*([\d.]+)/im);
   if (!match) {
     return 0;
   }
