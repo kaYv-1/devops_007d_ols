@@ -2,97 +2,118 @@
 
 ## Descripción del servicio
 
-Este repositorio contiene un microservicio Node.js basado en HTTP nativo, diseñado como una aplicación de demostración para la Evaluación Parcial N°2 de Ingeniería DevOps. El servicio expone dos rutas principales:
+Microservicio HTTP nativo de Node.js, sin dependencias externas. Expone:
 
-- `/` devuelve un mensaje JSON de bienvenida.
-- `/health` devuelve `{ "status": "ok" }` para validación de salud y monitoreo.
+- `GET /`: devuelve un mensaje JSON.
+- `GET /health`: devuelve el estado de salud en JSON.
+- Otras rutas: responden `404`.
 
-Su propósito es demostrar una cadena completa de validación, seguridad, entrega de artefactos y despliegue simulado usando GitHub Actions, Docker, Compose y Kubernetes.
+## Pipeline CI/CD
 
-## Diagrama del pipeline
+El pipeline está definido en [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).
 
 ```mermaid
 flowchart LR
-    A[Checkout] --> B[Test]
-    B --> C[Security]
-    C --> D[Build + Scan + Push]
-    D --> E[Deploy staging]
-    E --> F[Smoke test]
-    B -. failure .-> G[Alert issue]
-    C -. failure .-> G
-    D -. failure .-> G
-    E -. failure .-> G
+    A[Push o pull request] --> B[Test Node.js 20]
+    B --> C[Seguridad: Snyk y Trivy]
+    C --> D[Build Docker en main]
+    D --> E[Escaneo Trivy de imagen]
+    E --> F[Publicar imagen en GHCR]
+    F --> G[Deploy Compose en staging]
+    G --> H[Smoke test]
+    B -. fallo en push .-> I[Issue de alerta]
+    C -. fallo en push .-> I
+    D -. fallo en push .-> I
+    G -. fallo en push .-> I
 ```
 
-## Explicación de cada job y qué indicador cubre
+### Jobs
 
-- `test`: se ejecuta en cada push y pull request contra `main`; corre `node:test`, exige cobertura de líneas mínima de 80% y publica el reporte HTML. Cubre IE2 / IL2.2.
-- `security`: depende de `test`; ejecuta Snyk para dependencias y código, además de Trivy para el filesystem. Las vulnerabilidades `HIGH` o `CRITICAL` fallan el job y bloquean los siguientes. Cubre IE3 / IL2.3.
-- `build-scan-push`: solo en push a `main`, construye la imagen, agrega etiquetas OCI, escanea con Trivy y luego publica en GHCR usando el SHA corto. Cubre IE1 / IL2.1 e IE4 / IL2.4.
-- `deploy`: solo en push a `main` y después de la publicación, descarga esa misma imagen etiquetada y la despliega en el entorno GitHub `staging` con Compose; finaliza con un smoke test curl con reintentos. Cubre IE4 / IL2.4 e IE5 / IL2.5.
-- `alert`: crea un issue automáticamente cuando falla un job previo. Cubre IE3 / IL2.3.
+- `test`: se ejecuta en cada push y pull request a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y sube el informe HTML como artefacto.
+- `security`: depende de `test`; analiza dependencias y código con Snyk y ejecuta Trivy sobre el filesystem. Detecciones `HIGH`/`CRITICAL` bloquean los jobs siguientes.
+- `build-scan-push`: solo en push a `main`; construye la imagen con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto del commit.
+- `deploy`: solo después de publicar la imagen; selecciona el entorno GitHub `staging`, descarga esa misma imagen por SHA, la levanta con Compose y ejecuta un smoke test HTTP.
+- `alert`: abre un issue automático en GitHub si falla un job previo en un push.
 
-Este pipeline está definido en un único workflow, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml). El workflow antiguo de CI se retiró para evitar ejecuciones redundantes con Node 18 y dejar un único conjunto de checks requerido.
+Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `test` y `security` corren para pushes y pull requests a `main`.
 
-Los indicadores del documento de evaluación se identifican como IL2.1–IL2.5; se relacionan aquí con IE1–IE5 para mantener también la nomenclatura usada en las instrucciones del encargo.
+## Relación con los 10 pasos del encargo
 
-## Relación de los 10 pasos del profesor con los archivos del repo
+| Paso | Implementación |
+|---|---|
+| 01. Dockerfile | [Dockerfile](Dockerfile): build multistage, `node:20-alpine`, `USER node`, `EXPOSE` y `HEALTHCHECK`. |
+| 02. Compose | [compose.yaml](compose.yaml) ejecuta `app`, `nginx` y el servicio de prueba por perfil. |
+| 03. Variables | `.env` local basado en [.env.example](.env.example); `.env` está excluido en [.gitignore](.gitignore). |
+| 04. Healthchecks | Healthchecks HTTP para `app` y `nginx` en [compose.yaml](compose.yaml). |
+| 05. Orden | NGINX usa `depends_on` con `condition: service_healthy` para `app`. |
+| 06. Documentación | Este README documenta ejecución, pipeline, calidad y trazabilidad. |
+| 07. Volúmenes | NGINX monta [nginx.conf](nginx.conf) como solo lectura; las pruebas montan `./reports` al host. |
+| 08. Tests | [test/basic.test.js](test/basic.test.js) cubre `/health`, `/` y 404 con `node:test`. |
+| 09. Automatización | `npm test`, servicio Compose `tests` bajo perfil `test` y workflow GitHub Actions. |
+| 10. Reporte | [scripts/generate-report.js](scripts/generate-report.js) genera `reports/test-report.html`; Actions lo publica como artefacto. |
 
-| Paso | Descripción | Archivo o bloque principal |
-|---|---|---|
-| 01 | Dockerfile multistage + healthcheck | [Dockerfile](Dockerfile) |
-| 02 | Compose con servicios | [compose.yaml](compose.yaml) |
-| 03 | Variables de entorno y .env | [.env.example](.env.example) |
-| 04 | Healthcheck de servicios | [compose.yaml](compose.yaml) |
-| 05 | depends_on con condition service_healthy | [compose.yaml](compose.yaml) |
-| 06 | README documentación | [README.md](README.md) |
-| 07 | Volúmenes y nginx.conf | [nginx.conf](nginx.conf), [compose.yaml](compose.yaml) |
-| 08 | Pruebas con Node test | [test/basic.test.js](test/basic.test.js), [package.json](package.json) |
-| 09 | Servicio de pruebas + pipeline | [compose.yaml](compose.yaml), [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) |
-| 10 | Reporte HTML y artifact | [scripts/generate-report.js](scripts/generate-report.js), [scripts/run-tests.js](scripts/run-tests.js) |
+El contenedor `tests` es un proceso de ejecución única, no un servidor HTTP. Los healthchecks HTTP aplican a los servicios de larga ejecución (`app` y `nginx`).
 
-## Política de calidad
+## Relación con los indicadores del PDF
 
-La política de calidad aplicada es:
+La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 
-- Cobertura mínima del 80% de líneas de código.
-- El servicio `tests` es de ejecución única, por lo que no tiene healthcheck HTTP; `app` y `nginx` sí tienen healthchecks y NGINX espera a que la app esté saludable.
-- El pipeline falla si las pruebas unitarias fallan.
-- El pipeline falla si Trivy detecta vulnerabilidades en `HIGH` o `CRITICAL`.
-- El pipeline falla si Snyk detecta dependencias con severidad `high` o superior.
-- La salida de pruebas se presenta en HTML para revisión y trazabilidad.
+- **IE1 — Contenedores:** imagen Node Alpine, construcción multistage y ejecución como usuario no root.
+- **IE2 — Pruebas automatizadas y calidad:** ejecución automática en CI; el umbral de cobertura de líneas de 80% falla el job si no se cumple.
+- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
+- **IE4 — Despliegue y trazabilidad:** publicación en GHCR etiquetada con SHA corto y labels OCI `revision`/`source`; despliegue de la misma etiqueta en `staging` y smoke test.
+- **IE5 — Orquestación:** Docker Compose coordina la aplicación, NGINX como proxy/balanceador y el servicio de pruebas. `APP_REPLICAS` configura las réplicas y el workflow aplica tres en staging.
 
-## Cómo se garantiza la trazabilidad y la calidad
+## Política de calidad y seguridad
 
-- Cada commit se relaciona con una imagen GHCR construida a partir del SHA corto del commit; el despliegue de `main` consume esa misma etiqueta.
-- La imagen se etiqueta con `org.opencontainers.image.revision` y `org.opencontainers.image.source`.
-- El despliegue se ejecuta sobre un entorno `staging` con `environment: staging` en GitHub Actions.
-- El artefacto `reports/test-report.html` se sube a GitHub para revisión del comité técnico.
-- Los reportes y el entorno simulado permiten correlacionar el cambio, la prueba y el despliegue.
+- Al menos 80% de cobertura de líneas; pruebas fallidas o cobertura insuficiente fallan `npm test` y el job `test`.
+- Snyk aplica el umbral `high` a dependencias y análisis de código.
+- Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
+- Los jobs de build y despliegue dependen del job de seguridad exitoso.
+- La imagen se construye sin dependencias de runtime externas y corre como usuario no root.
+- Compose limita memoria/CPU, elimina capabilities y activa `no-new-privileges`; los servicios de aplicación y NGINX usan filesystem de solo lectura.
 
-## Cómo ejecutarlo localmente
+## Trazabilidad
+
+El SHA corto identifica la imagen publicada en GHCR. La imagen incluye los labels OCI `org.opencontainers.image.revision` y `org.opencontainers.image.source`. El job de despliegue descarga esa imagen por la misma etiqueta y registra el despliegue en el Environment `staging`. El reporte de pruebas queda asociado a la ejecución de Actions como artefacto.
+
+## Ejecución local
+
+Requiere Node.js 20 o superior y Docker con Docker Compose.
 
 ```bash
+# Instalar (sin dependencias de terceros)
+npm ci
+
+# Ejecutar pruebas y generar el reporte HTML
+npm test
+
+# Configurar variables
+cp .env.example .env
+
 # Construir la imagen
 docker build -t devops-007d-ols:latest .
 
-# Levantar la aplicación y NGINX
-cp .env.example .env
-docker compose up -d --build --scale app=3
+# Levantar app y NGINX; Compose toma el número de réplicas de APP_REPLICAS
+docker compose up -d --build
 
-# Probar la ruta de salud
-curl http://localhost:8080/health
+# Smoke test local
+curl --fail http://localhost:8080/health
 
-# Ejecutar pruebas unitarias dentro del contenedor
+# Ejecutar pruebas dentro del contenedor y escribir el reporte en ./reports
 docker compose --profile test run --rm tests
-
-# Ejecutar pruebas locales con Node
-npm test
 ```
 
-En Linux, para que el reporte del contenedor quede escribible por el usuario anfitrión, configura `TEST_UID` y `TEST_GID` en `.env` con los valores de `id -u` y `id -g`, respectivamente. En Docker Desktop para Windows o macOS, los valores por defecto del ejemplo suelen ser suficientes.
+En Linux, configura `TEST_UID` y `TEST_GID` en `.env` con los resultados de `id -u` e `id -g` si el proceso de pruebas no tiene permiso para escribir en `./reports`.
 
-## Marcadores para capturas
+## Configuración manual de GitHub
+
+1. Crear el secret de repositorio `SNYK_TOKEN`.
+2. Crear el GitHub Environment llamado exactamente `staging`.
+3. Proteger la rama `main` y exigir los checks `test` y `security`.
+4. Habilitar Dependabot alerts/security updates en la configuración del repositorio. Las actualizaciones están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
+
+## Capturas
 
 - [CAPTURA 1]
 - [CAPTURA 2]
@@ -100,13 +121,13 @@ En Linux, para que el reporte del contenedor quede escribible por el usuario anf
 - [CAPTURA 4]
 - [CAPTURA 5]
 - [CAPTURA 6]
-
-## Manifiestos Kubernetes extra
-
-La carpeta [k8s/](k8s/) contiene un Deployment con probes y límites de recursos, un Service interno y un HorizontalPodAutoscaler configurado por utilización de CPU.
+- [CAPTURA 7]
+- [CAPTURA 8]
+- [CAPTURA 9]
+- [CAPTURA 10]
 
 ## Declaración de uso de IA
 
-Se utilizó GitHub Copilot como apoyo para generar configuración, automatización y documentación técnica. La propuesta fue revisada y validada por el equipo de trabajo.
+Se utilizó GitHub Copilot como apoyo para generar configuración y documentación técnica. El equipo debe revisar y validar los contenidos antes de la entrega.
 
 ## Conclusiones

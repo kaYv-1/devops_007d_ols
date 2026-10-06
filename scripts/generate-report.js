@@ -14,6 +14,12 @@ const testResult = spawnSync(process.execPath, ['--test', '--test-reporter=tap',
 });
 
 const stdout = `${testResult.stdout || ''}${testResult.stderr || ''}`;
+if (testResult.stdout) {
+  process.stdout.write(testResult.stdout);
+}
+if (testResult.stderr) {
+  process.stderr.write(testResult.stderr);
+}
 const rows = [];
 const lines = stdout.split(/\r?\n/);
 let pendingRow = null;

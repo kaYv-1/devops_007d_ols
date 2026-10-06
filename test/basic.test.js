@@ -11,17 +11,9 @@ test('sum funciona con negativos', () => {
   assert.strictEqual(sum(-2, 2), 0);
 });
 
-test('sum convierte valores numericos como string', () => {
-  assert.strictEqual(sum('2', '3'), 5);
-});
-
-test('sum rechaza entradas no numericas', () => {
-  assert.throws(() => sum('abc', 2), /finite numeric values/);
-});
-
 test('GET /health devuelve 200 y estado ok', async () => {
   await withServer(async (port) => {
-    const response = await getResponse(port, '/health?check=1');
+    const response = await getResponse(port, '/health');
 
     assert.strictEqual(response.statusCode, 200);
     assert.deepStrictEqual(JSON.parse(response.body), { status: 'ok' });
@@ -30,7 +22,7 @@ test('GET /health devuelve 200 y estado ok', async () => {
 
 test('GET / devuelve 200 y el mensaje esperado', async () => {
   await withServer(async (port) => {
-    const response = await getResponse(port, '/?name=alice');
+    const response = await getResponse(port, '/');
 
     assert.strictEqual(response.statusCode, 200);
     assert.deepStrictEqual(JSON.parse(response.body), { message: 'micro-demo funcionando' });

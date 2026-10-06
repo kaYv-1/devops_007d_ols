@@ -29,9 +29,9 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    user: "101:101"
     ports:
       - "${NGINX_PORT:-8080}:8080"
+    user: "101:101"
     depends_on:
       app:
         condition: service_healthy
@@ -59,6 +59,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: test
     image: ${IMAGE_NAME:-devops-007d-ols}-tests:${IMAGE_TAG:-latest}
     command: ["node", "scripts/run-tests.js"]
     user: "${TEST_UID:-1000}:${TEST_GID:-1000}"

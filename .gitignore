@@ -1,5 +1,6 @@
 ﻿node_modules/
 *.log
 .env
+reports/*
+!reports/.gitkeep
 coverage/
-reports/
