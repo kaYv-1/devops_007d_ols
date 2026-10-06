@@ -71,6 +71,7 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 - Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
 - Los jobs de build y despliegue dependen del job de seguridad exitoso.
 - La imagen se construye sin dependencias de runtime externas y corre como usuario no root.
+- La etapa runtime elimina npm y npx, que no son necesarios para ejecutar el servicio; npm permanece disponible en la etapa de pruebas.
 - Compose limita memoria/CPU, elimina capabilities y activa `no-new-privileges`; los servicios de aplicación y NGINX usan filesystem de solo lectura.
 
 ## Trazabilidad
