@@ -195,7 +195,7 @@ jobs:
       issues: write
     steps:
       - name: Abrir issue por fallo del pipeline
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.issues.create({
