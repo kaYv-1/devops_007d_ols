@@ -71,6 +71,7 @@ services:
       - ./reports:/app/reports
     tmpfs:
       - /app/coverage:mode=1777
+      - /tmp:mode=1777
     read_only: true
     cap_drop:
       - ALL
