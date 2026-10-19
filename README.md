@@ -107,28 +107,30 @@ docker compose --profile test run --rm tests
 
 En Linux, configura `TEST_UID` y `TEST_GID` en `.env` con los resultados de `id -u` e `id -g` si el proceso de pruebas no tiene permiso para escribir en `./reports`.
 
-## Configuración manual de GitHub
+## Preparación de GitHub y staging simulado
 
-1. Crear el secret de repositorio `SNYK_TOKEN`.
-2. Crear el GitHub Environment llamado exactamente `staging`.
-3. Proteger la rama `main` y exigir los checks `test` y `security`.
-4. Habilitar Dependabot alerts/security updates en la configuración del repositorio. Las actualizaciones están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
+Antes de ejecutar el pipeline en GitHub:
 
-## Capturas
+1. Configurar el secret de repositorio `SNYK_TOKEN` con un token de Snyk válido. El job `security` falla explícitamente si falta; no omite los escaneos.
+2. Crear el GitHub Environment `staging`. El job `deploy` lo usa para identificar el destino de entrega.
+3. Dar acceso de lectura y escritura a GitHub Actions para publicar paquetes en GHCR. El workflow usa `GITHUB_TOKEN`; no requiere un token personal para publicar.
+4. Habilitar Dependabot alerts y security updates en la configuración del repositorio. Las actualizaciones semanales están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
+5. Proteger `main` y exigir los checks `test` y `security` antes de aceptar cambios.
+6. Integrar los cambios en `main`. Solo un `push` a esa rama publica la imagen y ejecuta el despliegue simulado.
 
-- [CAPTURA 1]
-- [CAPTURA 2]
-- [CAPTURA 3]
-- [CAPTURA 4]
-- [CAPTURA 5]
-- [CAPTURA 6]
-- [CAPTURA 7]
-- [CAPTURA 8]
-- [CAPTURA 9]
-- [CAPTURA 10]
+El job `deploy` levanta Docker Compose y verifica `/health` en el runner de GitHub Actions. Es un entorno cloud simulado y temporal: no es un servicio de staging persistente después de que termina el job. El SHA corto del commit identifica la imagen en GHCR y se reutiliza en el despliegue; los labels OCI guardan el SHA completo y el origen del repositorio.
 
-## Declaración de uso de IA
+## Lista de verificación y evidencias para la entrega
 
-Se utilizó GitHub Copilot como apoyo para generar configuración y documentación técnica. El equipo debe revisar y validar los contenidos antes de la entrega.
+La rama de entrega es `entrega-final-evaluacion-2`. Antes de entregar el enlace al repositorio:
 
-## Conclusiones
+- [ ] Confirmar que la pareja integró esta rama en `main` y que el repositorio remoto contiene los cambios.
+- [ ] Configurar `SNYK_TOKEN`, el Environment `staging` y los permisos de GHCR indicados arriba.
+- [ ] Revisar una ejecución exitosa del workflow `CI/CD`: pruebas/cobertura, análisis Snyk y Trivy, publicación de imagen y despliegue con smoke test.
+- [ ] Adjuntar evidencia real de GitHub Actions, del paquete GHCR etiquetado con el SHA y del resultado del smoke test. No se incluyen capturas de ejemplo como si fueran ejecuciones reales.
+- [ ] Completar los nombres de ambos integrantes y los datos de identificación que solicite el informe de la asignatura.
+- [ ] Cada integrante redacta por su cuenta su reflexión personal sobre el aprendizaje y su contribución; esa reflexión no debe generarse ni editarse con IA.
+
+## Declaración y cita del uso de IA
+
+Se utilizó GitHub Copilot como apoyo para revisar el repositorio, proponer y ajustar configuración/documentación técnica, y ejecutar verificaciones. El equipo debe revisar y validar los cambios. Si el informe cita contenido o asistencia generada con IA, cada integrante debe declarar la herramienta y cómo la utilizó, siguiendo el formato de citación solicitado por la asignatura. Esta declaración no sustituye las citas específicas requeridas en el informe ni las reflexiones personales individuales.
