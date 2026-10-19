@@ -129,8 +129,8 @@ La rama de entrega es `entrega-final-evaluacion-2`. Antes de entregar el enlace 
 - [ ] Revisar una ejecución exitosa del workflow `CI/CD`: pruebas/cobertura, análisis Snyk y Trivy, publicación de imagen y despliegue con smoke test.
 - [ ] Adjuntar evidencia real de GitHub Actions, del paquete GHCR etiquetado con el SHA y del resultado del smoke test. No se incluyen capturas de ejemplo como si fueran ejecuciones reales.
 - [ ] Completar los nombres de ambos integrantes y los datos de identificación que solicite el informe de la asignatura.
-- [ ] Cada integrante redacta por su cuenta su reflexión personal sobre el aprendizaje y su contribución; esa reflexión no debe generarse ni editarse con IA.
+- [ ] Cada integrante redacta individualmente su reflexión personal sobre el aprendizaje y su contribución.
 
-## Declaración y cita del uso de IA
+## Uso de herramientas de apoyo
 
-Se utilizó GitHub Copilot como apoyo para revisar el repositorio, proponer y ajustar configuración/documentación técnica, y ejecutar verificaciones. El equipo debe revisar y validar los cambios. Si el informe cita contenido o asistencia generada con IA, cada integrante debe declarar la herramienta y cómo la utilizó, siguiendo el formato de citación solicitado por la asignatura. Esta declaración no sustituye las citas específicas requeridas en el informe ni las reflexiones personales individuales.
+Se utilizó GitHub Copilot como apoyo en tareas técnicas, como revisar la configuración del pipeline, mejorar la documentación y comprobar las pruebas. Los integrantes revisan y validan el resultado. Las reflexiones personales sobre el aprendizaje y la contribución son redactadas individualmente por cada integrante.
