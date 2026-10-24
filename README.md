@@ -60,7 +60,7 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 
 - **IE1 — Contenedores:** imagen Node Alpine, construcción multistage y ejecución como usuario no root.
 - **IE2 — Pruebas automatizadas y calidad:** ejecución automática en CI; el umbral de cobertura de líneas de 80% falla el job si no se cumple.
-- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
+- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; SonarQube Cloud para calidad de código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
 - **IE4 — Despliegue y trazabilidad:** publicación en GHCR etiquetada con SHA corto y labels OCI `revision`/`source`; despliegue de la misma etiqueta en `staging` y smoke test.
 - **IE5 — Orquestación:** Docker Compose coordina la aplicación, NGINX como proxy/balanceador y el servicio de pruebas. `APP_REPLICAS` configura las réplicas y el workflow aplica tres en staging.
 
@@ -68,6 +68,7 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 
 - Al menos 80% de cobertura de líneas; pruebas fallidas o cobertura insuficiente fallan `npm test` y el job `test`.
 - Snyk aplica el umbral `high` a dependencias y análisis de código.
+- SonarQube Cloud analiza calidad, mantenibilidad y seguridad estática según `sonar-project.properties`.
 - Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
 - Los jobs de build y despliegue dependen del job de seguridad exitoso.
 - La imagen se construye sin dependencias de runtime externas y corre como usuario no root.
