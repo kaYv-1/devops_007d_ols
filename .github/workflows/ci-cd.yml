@@ -1,0 +1,206 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar pruebas y umbral de cobertura
+        run: npm test
+
+      - name: Publicar reporte HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: reports/test-report.html
+          if-no-files-found: warn
+
+  security:
+    name: security
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Validar configuración del token de Snyk
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "Configura el secret SNYK_TOKEN en el repositorio." >&2
+            exit 1
+          fi
+
+      - name: Análisis de dependencias con Snyk
+        uses: snyk/actions/node@master
+        with:
+          args: --severity-threshold=high --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Análisis de código con Snyk Code
+        uses: snyk/actions/node@master
+        with:
+          command: code test
+          args: --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Escaneo del filesystem con Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  build-scan-push:
+    name: build-scan-push
+    needs: security
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir imagen con etiquetas OCI
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+        run: |
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_REF="ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${GITHUB_SHA::7}"
+          echo "IMAGE_REF=${IMAGE_REF}" >> "$GITHUB_ENV"
+          docker buildx build \
+            --platform linux/amd64 \
+            --load \
+            --tag "$IMAGE_REF" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            .
+
+      - name: Escanear imagen con Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Publicar imagen validada en GHCR
+        run: docker push "${{ env.IMAGE_REF }}"
+
+  deploy:
+    name: deploy
+    needs: build-scan-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: staging
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Preparar variables para desplegar el commit
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+        run: |
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY_LC="$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "PORT=3000"
+            echo "NODE_ENV=production"
+            echo "IMAGE_NAME=ghcr.io/${OWNER_LC}/${REPOSITORY_LC}"
+            echo "IMAGE_TAG=${GITHUB_SHA::7}"
+            echo "NGINX_PORT=8080"
+            echo "APP_REPLICAS=3"
+          } > .env
+
+      - name: Desplegar con Docker Compose la imagen escaneada
+        run: |
+          docker compose pull app
+          docker compose up -d --no-build --scale app=3
+
+      - name: Smoke test
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://localhost:8080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El smoke test de staging falló después de 40 segundos." >&2
+          exit 1
+
+      - name: Mostrar estado del despliegue
+        run: docker compose ps
+
+  alert:
+    name: alert
+    if: failure() && github.event_name == 'push'
+    needs: [test, security, build-scan-push, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Abrir issue por fallo del pipeline
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Fallo del pipeline para ${context.sha.substring(0, 7)}`,
+              body: `El workflow CI/CD falló para el commit ${context.sha}. Revisa los logs del job fallido y corrige el problema.`
+            });
