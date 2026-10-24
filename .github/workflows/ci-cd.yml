@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -46,6 +48,8 @@ jobs:
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validar configuración del token de Snyk
         env:
@@ -78,6 +82,11 @@ jobs:
           format: table
           severity: HIGH,CRITICAL
           exit-code: "1"
+
+      - name: Analizar calidad con SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-scan-push:
     name: build-scan-push

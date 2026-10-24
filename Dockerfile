@@ -12,6 +12,7 @@ CMD ["npm", "test"]
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build --chown=node:node /app/package*.json ./
 COPY --from=build --chown=node:node /app/src ./src
 USER node

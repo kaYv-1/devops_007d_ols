@@ -60,7 +60,7 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 
 - **IE1 — Contenedores:** imagen Node Alpine, construcción multistage y ejecución como usuario no root.
 - **IE2 — Pruebas automatizadas y calidad:** ejecución automática en CI; el umbral de cobertura de líneas de 80% falla el job si no se cumple.
-- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
+- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; SonarQube Cloud para calidad de código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
 - **IE4 — Despliegue y trazabilidad:** publicación en GHCR etiquetada con SHA corto y labels OCI `revision`/`source`; despliegue de la misma etiqueta en `staging` y smoke test.
 - **IE5 — Orquestación:** Docker Compose coordina la aplicación, NGINX como proxy/balanceador y el servicio de pruebas. `APP_REPLICAS` configura las réplicas y el workflow aplica tres en staging.
 
@@ -68,9 +68,11 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 
 - Al menos 80% de cobertura de líneas; pruebas fallidas o cobertura insuficiente fallan `npm test` y el job `test`.
 - Snyk aplica el umbral `high` a dependencias y análisis de código.
+- SonarQube Cloud analiza calidad, mantenibilidad y seguridad estática según `sonar-project.properties`.
 - Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
 - Los jobs de build y despliegue dependen del job de seguridad exitoso.
 - La imagen se construye sin dependencias de runtime externas y corre como usuario no root.
+- La etapa runtime elimina npm y npx, que no son necesarios para ejecutar el servicio; npm permanece disponible en la etapa de pruebas.
 - Compose limita memoria/CPU, elimina capabilities y activa `no-new-privileges`; los servicios de aplicación y NGINX usan filesystem de solo lectura.
 
 ## Trazabilidad
@@ -106,28 +108,30 @@ docker compose --profile test run --rm tests
 
 En Linux, configura `TEST_UID` y `TEST_GID` en `.env` con los resultados de `id -u` e `id -g` si el proceso de pruebas no tiene permiso para escribir en `./reports`.
 
-## Configuración manual de GitHub
+## Preparación de GitHub y staging simulado
 
-1. Crear el secret de repositorio `SNYK_TOKEN`.
-2. Crear el GitHub Environment llamado exactamente `staging`.
-3. Proteger la rama `main` y exigir los checks `test` y `security`.
-4. Habilitar Dependabot alerts/security updates en la configuración del repositorio. Las actualizaciones están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
+Antes de ejecutar el pipeline en GitHub:
 
-## Capturas
+1. Configurar el secret de repositorio `SNYK_TOKEN` con un token de Snyk válido. El job `security` falla explícitamente si falta; no omite los escaneos.
+2. Crear el GitHub Environment `staging`. El job `deploy` lo usa para identificar el destino de entrega.
+3. Dar acceso de lectura y escritura a GitHub Actions para publicar paquetes en GHCR. El workflow usa `GITHUB_TOKEN`; no requiere un token personal para publicar.
+4. Habilitar Dependabot alerts y security updates en la configuración del repositorio. Las actualizaciones semanales están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
+5. Proteger `main` y exigir los checks `test` y `security` antes de aceptar cambios.
+6. Integrar los cambios en `main`. Solo un `push` a esa rama publica la imagen y ejecuta el despliegue simulado.
 
-- [CAPTURA 1]
-- [CAPTURA 2]
-- [CAPTURA 3]
-- [CAPTURA 4]
-- [CAPTURA 5]
-- [CAPTURA 6]
-- [CAPTURA 7]
-- [CAPTURA 8]
-- [CAPTURA 9]
-- [CAPTURA 10]
+El job `deploy` levanta Docker Compose y verifica `/health` en el runner de GitHub Actions. Es un entorno cloud simulado y temporal: no es un servicio de staging persistente después de que termina el job. El SHA corto del commit identifica la imagen en GHCR y se reutiliza en el despliegue; los labels OCI guardan el SHA completo y el origen del repositorio.
 
-## Declaración de uso de IA
+## Lista de verificación y evidencias para la entrega
 
-Se utilizó GitHub Copilot como apoyo para generar configuración y documentación técnica. El equipo debe revisar y validar los contenidos antes de la entrega.
+La rama de entrega es `entrega-final-evaluacion-2`. Antes de entregar el enlace al repositorio:
 
-## Conclusiones
+- [ ] Confirmar que la pareja integró esta rama en `main` y que el repositorio remoto contiene los cambios.
+- [ ] Configurar `SNYK_TOKEN`, el Environment `staging` y los permisos de GHCR indicados arriba.
+- [ ] Revisar una ejecución exitosa del workflow `CI/CD`: pruebas/cobertura, análisis Snyk y Trivy, publicación de imagen y despliegue con smoke test.
+- [ ] Adjuntar evidencia real de GitHub Actions, del paquete GHCR etiquetado con el SHA y del resultado del smoke test. No se incluyen capturas de ejemplo como si fueran ejecuciones reales.
+- [ ] Completar los nombres de ambos integrantes y los datos de identificación que solicite el informe de la asignatura.
+- [ ] Cada integrante redacta individualmente su reflexión personal sobre el aprendizaje y su contribución.
+
+## Uso de herramientas de apoyo
+
+Se utilizó GitHub Copilot como apoyo en tareas técnicas, como revisar la configuración del pipeline, mejorar la documentación y comprobar las pruebas. Los integrantes revisan y validan el resultado. Las reflexiones personales sobre el aprendizaje y la contribución son redactadas individualmente por cada integrante.
