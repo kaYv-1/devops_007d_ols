@@ -123,14 +123,13 @@ El job `deploy` levanta Docker Compose y verifica `/health` en el runner de GitH
 
 ## Lista de verificación y evidencias para la entrega
 
-La rama de entrega es `entrega-final-evaluacion-2`. Antes de entregar el enlace al repositorio:
+La rama de entrega es `main`. Todo el trabajo está integrado en esa rama y el repositorio remoto contiene los cambios.
 
-- [ ] Confirmar que la pareja integró esta rama en `main` y que el repositorio remoto contiene los cambios.
-- [ ] Configurar `SNYK_TOKEN`, el Environment `staging` y los permisos de GHCR indicados arriba.
-- [ ] Revisar una ejecución exitosa del workflow `CI/CD`: pruebas/cobertura, análisis Snyk y Trivy, publicación de imagen y despliegue con smoke test.
-- [ ] Adjuntar evidencia real de GitHub Actions, del paquete GHCR etiquetado con el SHA y del resultado del smoke test. No se incluyen capturas de ejemplo como si fueran ejecuciones reales.
-- [ ] Completar los nombres de ambos integrantes y los datos de identificación que solicite el informe de la asignatura.
-- [ ] Cada integrante redacta individualmente su reflexión personal sobre el aprendizaje y su contribución.
+- [x] La pareja integró el trabajo final en `main` y el repositorio remoto contiene los cambios.
+- [x] `SNYK_TOKEN` y `SONAR_TOKEN` configurados como secrets; el Environment `staging` creado; permisos de GHCR habilitados.
+- [x] Ejecución exitosa del workflow `CI/CD`: pruebas con cobertura de al menos 80%, análisis Snyk, Trivy y SonarQube Cloud, publicación de imagen en GHCR y despliegue con smoke test.
+- [x] Reflexión personal de Angel Venegas incluida en este README.
+- [ ] Reflexión personal de Israel Poblete (pendiente de redactar individualmente).
 
 ## Uso de herramientas de apoyo
 
