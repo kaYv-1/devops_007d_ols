@@ -135,3 +135,11 @@ La rama de entrega es `entrega-final-evaluacion-2`. Antes de entregar el enlace 
 ## Uso de herramientas de apoyo
 
 Se utilizó GitHub Copilot como apoyo en tareas técnicas, como revisar la configuración del pipeline, mejorar la documentación y comprobar las pruebas. Los integrantes revisan y validan el resultado. Las reflexiones personales sobre el aprendizaje y la contribución son redactadas individualmente por cada integrante.
+
+## Conclusiones y reflexiones individuales
+
+### Reflexión de Angel Venegas
+
+Durante el desarrollo de esta evaluación me enfoqué principalmente en la contenerización y en la arquitectura de orquestación del microservicio. El diseño del Dockerfile con construcción multistage me permitió comprender cómo separar las herramientas de prueba del artefacto final de producción, reduciendo el peso de la imagen y aplicando directivas de seguridad como la ejecución con un usuario no root y la eliminación de binarios innecesarios en la etapa de runtime.
+
+Asimismo, trabajar con Docker Compose para gestionar tres réplicas del servicio coordinadas bajo un balanceador NGINX me demostró la importancia de la alta disponibilidad y el desacoplamiento en sistemas distribuidos. La configuración de comprobaciones de salud (healthchecks) y límites de consumo de recursos tanto en local como en la automatización del pipeline me ayudó a entender cómo se asegura que el tráfico se dirija únicamente a instancias estables y listas para operar.
