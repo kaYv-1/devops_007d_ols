@@ -174,10 +174,10 @@ Durante el desarrollo de esta evaluación me enfoqué principalmente en la conte
 
 Asimismo, trabajar con Docker Compose para gestionar tres réplicas del servicio coordinadas bajo un balanceador NGINX me demostró la importancia de la alta disponibilidad y el desacoplamiento en sistemas distribuidos. La configuración de comprobaciones de salud (healthchecks) y límites de consumo de recursos tanto en local como en la automatización del pipeline me ayudó a entender cómo se asegura que el tráfico se dirija únicamente a instancias estables y listas para operar.
 
-## Conclusión
+## Reflexión de Isreel Poblete
 
-El proyecto implementa un microservicio HTTP autocontenido en Node.js, con los endpoints `/` y `/health`, pruebas automatizadas y una política mínima de cobertura del 80%. Puede ejecutarse directamente con Node.js o mediante una imagen Docker multietapa basada en Alpine, con usuario no root, filesystem restringido y healthchecks.
+Durante el desarrollo de esta evaluación me enfoqué principalmente en la automatización del ciclo de validación y entrega del microservicio. Trabajar con las pruebas de Node.js y establecer un mínimo de 80% de cobertura me permitió comprender la importancia de comprobar que los cambios funcionen antes de integrarlos al proyecto. Además, la configuración de GitHub Actions me ayudó a relacionar las pruebas con los análisis de seguridad de Snyk, Trivy y SonarQube.
 
-Docker Compose coordina la aplicación, NGINX y el servicio de pruebas. NGINX publica el acceso externo por el puerto `8080` y reenvía las solicitudes hacia la aplicación. El workflow de GitHub Actions valida las pruebas, la cobertura, la seguridad y la calidad antes de construir, escanear y publicar la imagen en GHCR. En los pushes a `main`, despliega la misma imagen identificada por el SHA corto y ejecuta un smoke test sobre `/health`.
+También aprendí cómo una imagen Docker puede vincularse directamente con el commit que la originó mediante una etiqueta basada en el SHA. Esto permitió comprender mejor la trazabilidad del proceso, desde el código fuente hasta la publicación en GHCR y el despliegue con Docker Compose. Finalmente, la ejecución del smoke test sobre el endpoint /health reforzó la importancia de validar no solo el código, sino también el funcionamiento de la aplicación una vez desplegada.
 
-Por lo tanto, la documentación refleja la estructura y el funcionamiento actual del repositorio, incluyendo sus comandos de ejecución, variables de configuración, controles de calidad, medidas de seguridad y flujo de despliegue. El entorno de staging descrito es temporal y se ejecuta dentro del runner de GitHub Actions; no representa un servicio persistente.
+
