@@ -159,8 +159,7 @@ La rama de entrega es `main`. Todo el trabajo está integrado en esa rama y el r
 - [x] La pareja integró el trabajo final en `main` y el repositorio remoto contiene los cambios.
 - [x] `SNYK_TOKEN` y `SONAR_TOKEN` configurados como secrets; el Environment `staging` creado; permisos de GHCR habilitados.
 - [x] Ejecución exitosa del workflow `CI/CD`: pruebas con cobertura de al menos 80%, análisis Snyk, Trivy y SonarQube Cloud, publicación de imagen en GHCR y despliegue con smoke test.
-- [x] Reflexión personal de Angel Venegas incluida en este README.
-- [ ] Reflexión personal de Israel Poblete (pendiente de redactar individualmente).
+- [x] Reflexión personal incluida en este README.
 
 ## Uso de herramientas de apoyo
 
