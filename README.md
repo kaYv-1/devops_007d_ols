@@ -29,19 +29,19 @@ flowchart LR
 
 ### Jobs
 
-- `test`: se ejecuta en cada push y pull request a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y sube el informe HTML como artefacto.
+- `test`: se ejecuta en todos los pushes y en los pull requests dirigidos a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y sube el informe HTML como artefacto.
 - `security`: depende de `test`; analiza dependencias y código con Snyk y ejecuta Trivy sobre el filesystem. Detecciones `HIGH`/`CRITICAL` bloquean los jobs siguientes.
 - `build-scan-push`: solo en push a `main`; construye la imagen con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto del commit.
 - `deploy`: solo después de publicar la imagen; selecciona el entorno GitHub `staging`, descarga esa misma imagen por SHA, la levanta con Compose y ejecuta un smoke test HTTP.
 - `alert`: abre un issue automático en GitHub si falla un job previo en un push.
 
-Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `test` y `security` corren para pushes y pull requests a `main`.
+Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `test` y `security` corren para todos los pushes y para pull requests dirigidos a `main`.
 
 ## Relación con los 10 pasos del encargo
 
 | Paso | Implementación |
 |---|---|
-| 01. Dockerfile | [Dockerfile](Dockerfile): build multistage, `node:20-alpine`, `USER node`, `EXPOSE` y `HEALTHCHECK`. |
+| 01. Dockerfile | [Dockerfile](Dockerfile): build multistage, `node:20-alpine`, `USER node`, `EXPOSE` y `HEALTHCHECK`. [.dockerignore](.dockerignore) excluye archivos innecesarios del contexto de construcción. |
 | 02. Compose | [compose.yaml](compose.yaml) ejecuta `app`, `nginx` y el servicio de prueba por perfil. |
 | 03. Variables | `.env` local basado en [.env.example](.env.example); `.env` está excluido en [.gitignore](.gitignore). |
 | 04. Healthchecks | Healthchecks HTTP para `app` y `nginx` en [compose.yaml](compose.yaml). |
@@ -81,32 +81,63 @@ El SHA corto identifica la imagen publicada en GHCR. La imagen incluye los label
 
 ## Ejecución local
 
-Requiere Node.js 20 o superior y Docker con Docker Compose.
+Requiere Node.js 20 o superior para ejecutar el proyecto directamente y Docker con Docker Compose para ejecutar el stack contenedorizado.
 
 ```bash
-# Instalar (sin dependencias de terceros)
+# Instalar y verificar el proyecto (no hay dependencias de terceros)
 npm ci
 
-# Ejecutar pruebas y generar el reporte HTML
+# Ejecutar el servicio directamente en http://localhost:3000
+npm start
+
+# Ejecutar pruebas, validar cobertura mínima y generar el reporte HTML
 npm test
 
-# Configurar variables
+# Generar solamente el reporte HTML de pruebas
+npm run test:report
+
+# Configurar variables para Docker Compose
 cp .env.example .env
 
 # Construir la imagen
 docker build -t devops-007d-ols:latest .
 
-# Levantar app y NGINX; Compose toma el número de réplicas de APP_REPLICAS
-docker compose up -d --build
+# Levantar la aplicación y NGINX; el escalamiento se indica explícitamente
+docker compose up -d --build --scale app="${APP_REPLICAS:-3}"
 
-# Smoke test local
+# Smoke test local a través de NGINX
 curl --fail http://localhost:8080/health
 
 # Ejecutar pruebas dentro del contenedor y escribir el reporte en ./reports
 docker compose --profile test run --rm tests
 ```
 
+El servicio directo utiliza `PORT=3000` por defecto. En Docker Compose, NGINX publica el puerto definido por `NGINX_PORT` (por defecto, `8080`) y reenvía las solicitudes al servicio `app`.
+
 En Linux, configura `TEST_UID` y `TEST_GID` en `.env` con los resultados de `id -u` e `id -g` si el proceso de pruebas no tiene permiso para escribir en `./reports`.
+
+### Variables de entorno
+
+Las variables se pueden definir en `.env` a partir de [.env.example](.env.example):
+
+| Variable | Descripción | Valor predeterminado |
+|---|---|---|
+| `PORT` | Puerto interno del servicio Node.js | `3000` |
+| `NODE_ENV` | Entorno de ejecución | `production` |
+| `IMAGE_NAME` | Nombre de la imagen Docker de la aplicación | `devops-007d-ols` |
+| `IMAGE_TAG` | Etiqueta de la imagen Docker | `latest` |
+| `NGINX_PORT` | Puerto publicado por NGINX | `8080` |
+| `APP_REPLICAS` | Cantidad configurada de réplicas de `app` | `3` |
+| `TEST_UID` | UID usado por el contenedor de pruebas | `1000` |
+| `TEST_GID` | GID usado por el contenedor de pruebas | `1000` |
+
+Los scripts disponibles en [package.json](package.json) son:
+
+| Comando | Propósito |
+|---|---|
+| `npm start` | Inicia el servicio HTTP en el puerto configurado por `PORT`. |
+| `npm test` | Ejecuta las pruebas, valida el 80% mínimo de cobertura y genera el reporte HTML. |
+| `npm run test:report` | Ejecuta las pruebas y genera `reports/test-report.html` sin aplicar el umbral de cobertura. |
 
 ## Preparación de GitHub y staging simulado
 
@@ -142,3 +173,11 @@ Se utilizó GitHub Copilot como apoyo en tareas técnicas, como revisar la confi
 Durante el desarrollo de esta evaluación me enfoqué principalmente en la contenerización y en la arquitectura de orquestación del microservicio. El diseño del Dockerfile con construcción multistage me permitió comprender cómo separar las herramientas de prueba del artefacto final de producción, reduciendo el peso de la imagen y aplicando directivas de seguridad como la ejecución con un usuario no root y la eliminación de binarios innecesarios en la etapa de runtime.
 
 Asimismo, trabajar con Docker Compose para gestionar tres réplicas del servicio coordinadas bajo un balanceador NGINX me demostró la importancia de la alta disponibilidad y el desacoplamiento en sistemas distribuidos. La configuración de comprobaciones de salud (healthchecks) y límites de consumo de recursos tanto en local como en la automatización del pipeline me ayudó a entender cómo se asegura que el tráfico se dirija únicamente a instancias estables y listas para operar.
+
+## Conclusión
+
+El proyecto implementa un microservicio HTTP autocontenido en Node.js, con los endpoints `/` y `/health`, pruebas automatizadas y una política mínima de cobertura del 80%. Puede ejecutarse directamente con Node.js o mediante una imagen Docker multietapa basada en Alpine, con usuario no root, filesystem restringido y healthchecks.
+
+Docker Compose coordina la aplicación, NGINX y el servicio de pruebas. NGINX publica el acceso externo por el puerto `8080` y reenvía las solicitudes hacia la aplicación. El workflow de GitHub Actions valida las pruebas, la cobertura, la seguridad y la calidad antes de construir, escanear y publicar la imagen en GHCR. En los pushes a `main`, despliega la misma imagen identificada por el SHA corto y ejecuta un smoke test sobre `/health`.
+
+Por lo tanto, la documentación refleja la estructura y el funcionamiento actual del repositorio, incluyendo sus comandos de ejecución, variables de configuración, controles de calidad, medidas de seguridad y flujo de despliegue. El entorno de staging descrito es temporal y se ejecuta dentro del runner de GitHub Actions; no representa un servicio persistente.
