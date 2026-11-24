@@ -258,6 +258,21 @@ jobs:
       - name: Esperar rollout
         run: kubectl rollout status deployment/micro-demo --namespace devops-staging --timeout=180s
 
+      - name: Diagnosticar rollout de AKS
+        if: failure()
+        run: |
+          echo "=== Deployment ==="
+          kubectl describe deployment micro-demo -n devops-staging || true
+          echo "=== Pods ==="
+          kubectl get pods -n devops-staging -o wide || true
+          kubectl describe pods -n devops-staging || true
+          echo "=== Eventos ==="
+          kubectl get events -n devops-staging --sort-by=.lastTimestamp || true
+          echo "=== Logs ==="
+          kubectl logs -n devops-staging -l app.kubernetes.io/name=micro-demo --all-containers --tail=100 || true
+          echo "=== Service ==="
+          kubectl describe service micro-demo -n devops-staging || true
+
       - name: Esperar endpoint externo
         run: |
           for attempt in {1..30}; do
