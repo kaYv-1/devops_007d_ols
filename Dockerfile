@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:20.19.1-alpine3.21 AS build
 WORKDIR /app
 COPY package*.json ./
 COPY src ./src
@@ -9,11 +9,10 @@ COPY scripts ./scripts
 USER node
 CMD ["npm", "test"]
 
-FROM node:20-alpine AS runtime
+FROM node:20.19.1-alpine3.21 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk upgrade --no-cache && \
-    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build --chown=node:node /app/package*.json ./
 COPY --from=build --chown=node:node /app/src ./src
 USER node

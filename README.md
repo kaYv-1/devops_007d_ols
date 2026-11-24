@@ -6,7 +6,12 @@ Microservicio HTTP nativo de Node.js, sin dependencias externas. Expone:
 
 - `GET /`: devuelve un mensaje JSON.
 - `GET /health`: devuelve el estado de salud en JSON.
+- `GET /metrics`: expone métricas Prometheus de solicitudes, errores, latencia y proceso.
 - Otras rutas: responden `404`.
+
+Las solicitudes generan logs JSON con timestamp, método, ruta, código de respuesta,
+duración e identificador de correlación `X-Request-ID`. El endpoint `/metrics` está
+preparado para ser recolectado por Prometheus en la siguiente fase de observabilidad.
 
 ## Pipeline CI/CD
 
@@ -78,6 +83,15 @@ La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
 ## Trazabilidad
 
 El SHA corto identifica la imagen publicada en GHCR. La imagen incluye los labels OCI `org.opencontainers.image.revision` y `org.opencontainers.image.source`. El job de despliegue descarga esa imagen por la misma etiqueta y registra el despliegue en el Environment `staging`. El reporte de pruebas queda asociado a la ejecución de Actions como artefacto.
+
+### Despliegue Kubernetes en AKS
+
+La fase 2 incorpora manifiestos Kubernetes en [`k8s/`](k8s/) para desplegar
+tres réplicas en Azure Kubernetes Service, con probes HTTP, límites de
+recursos, ejecución no root y anotaciones de scraping para `/metrics`.
+El workflow ejecuta el job `deploy-aks` cuando la variable de repositorio
+`AKS_ENABLED` vale `true`. La configuración de Azure, OIDC, GHCR y el smoke
+test está documentada en [`docs/kubernetes-aks.md`](docs/kubernetes-aks.md).
 
 ## Ejecución local
 

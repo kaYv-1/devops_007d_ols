@@ -8,5 +8,8 @@
     "test": "node scripts/run-tests.js",
     "test:report": "node scripts/generate-report.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "prom-client": "^15.1.3"
+  }
 }
