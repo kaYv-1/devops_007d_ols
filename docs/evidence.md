@@ -69,6 +69,15 @@ terminó con conclusión `success`: `test` y `security` pasaron; el artifact
 `skipped` por sus condiciones de ejecución en `main` y la variable
 `AKS_ENABLED`; este run no verifica el despliegue en AKS.
 
+En el commit `153769a`, el run
+[#86](https://github.com/kaYv-1/devops_007d_ols/actions/runs/45431670789)
+también terminó con `test` y `security` exitosos. El job `security` descargó
+el artifact `coverage`, validó `coverage/lcov.info` y SonarQube Cloud registró
+en su log `Analysing [.../coverage/lcov.info]` y
+`QUALITY GATE STATUS: PASSED`. Así queda verificada la importación de cobertura
+y la espera efectiva del Quality Gate. Los jobs de publicación y despliegue
+siguen omitidos en esta rama, por lo que este run no acredita AKS.
+
 El push del commit `b985348` en
 [`demo/falla-critica`](https://github.com/kaYv-1/devops_007d_ols/actions/runs/45428621730)
 terminó con conclusión `failure`: `test` pasó; `security` falló en el análisis
