@@ -95,6 +95,9 @@ El workflow ejecuta el job `deploy-aks` cuando la variable de repositorio
 `AKS_ENABLED` vale `true`. La configuración de Azure, OIDC, GHCR y el smoke
 test está documentada en [`docs/kubernetes-aks.md`](docs/kubernetes-aks.md).
 
+Para ensayar la demostración y responder preguntas de evaluación, consultar
+[`docs/evaluation-preparation.md`](docs/evaluation-preparation.md).
+
 ### Observabilidad en AKS
 
 La fase de observabilidad instala `kube-prometheus-stack` y configura:
