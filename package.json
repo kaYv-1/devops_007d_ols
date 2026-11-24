@@ -1,7 +1,7 @@
 {
   "name": "micro-demo",
   "version": "1.0.0",
-  "description": "Microservicio de prueba para Evaluacion Parcial N°2 - Ingenieria DevOps",
+  "description": "Microservicio de observabilidad para Evaluación Parcial N°3 - DOY0101 DevOps",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

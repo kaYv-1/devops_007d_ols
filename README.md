@@ -1,8 +1,8 @@
-# DevOps 007D OLS
+# DevOps 007D OLS — EP3: Observabilidad y entornos reales
 
 ## Descripción del servicio
 
-Microservicio HTTP nativo de Node.js, sin dependencias externas. Expone:
+Microservicio HTTP de Node.js instrumentado con `prom-client`. Expone:
 
 - `GET /`: devuelve un mensaje JSON.
 - `GET /health`: devuelve el estado de salud en JSON.
@@ -25,20 +25,24 @@ flowchart LR
     D --> E[Escaneo Trivy de imagen]
     E --> F[Publicar imagen en GHCR]
     F --> G[Deploy Compose en staging]
-    G --> H[Smoke test]
-    B -. fallo en push .-> I[Issue de alerta]
-    C -. fallo en push .-> I
-    D -. fallo en push .-> I
-    G -. fallo en push .-> I
+    F --> I[Deploy AKS cuando AKS_ENABLED=true]
+    I --> J[Smoke test y métricas CI/CD]
+    J --> K[Pushgateway y Prometheus]
+    K --> L[Grafana y alertas]
+    B -. fallo en push .-> N[Issue de alerta]
+    C -. fallo en push .-> N
+    D -. fallo en push .-> N
+    G -. fallo en push .-> N
+    J -. fallo en push .-> N
 ```
 
 ### Jobs
 
-- `test`: se ejecuta en todos los pushes y en los pull requests dirigidos a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y sube el informe HTML como artefacto.
+- `test`: se ejecuta en todos los pushes y en los pull requests dirigidos a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y publica los reportes HTML y `reports/coverage.txt` como artifacts.
 - `security`: depende de `test`; analiza dependencias y código con Snyk y ejecuta Trivy sobre el filesystem. Detecciones `HIGH`/`CRITICAL` bloquean los jobs siguientes.
 - `build-scan-push`: solo en push a `main`; construye la imagen con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto del commit.
 - `deploy`: solo después de publicar la imagen; selecciona el entorno GitHub `staging`, descarga esa misma imagen por SHA, la levanta con Compose y ejecuta un smoke test HTTP.
-- `deploy-aks`: despliega en Azure Kubernetes Service, instala Prometheus/Grafana y aplica ServiceMonitor, reglas de alerta y dashboard.
+- `deploy-aks`: descarga el artifact de cobertura, mide el tiempo del job, despliega en Azure Kubernetes Service, instala Prometheus/Grafana y Pushgateway, y publica métricas de CI/CD después del smoke test.
 - `alert`: abre un issue automático en GitHub si falla un job previo en un push.
 
 Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `test` y `security` corren para todos los pushes y para pull requests dirigidos a `main`.
@@ -60,16 +64,16 @@ Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `te
 
 El contenedor `tests` es un proceso de ejecución única, no un servidor HTTP. Los healthchecks HTTP aplican a los servicios de larga ejecución (`app` y `nginx`).
 
-## Relación con los indicadores del PDF
+## Indicadores de la Evaluación Parcial N°3
 
-La pauta denomina los indicadores `IE1`–`IE6`:
+La implementación EP3 se organiza alrededor de los indicadores `IE1`–`IE6`:
 
-- **IE1 — Contenedores:** imagen Node Alpine, construcción multistage y ejecución como usuario no root.
-- **IE2 — Pruebas automatizadas y calidad:** ejecución automática en CI; el umbral de cobertura de líneas de 80% falla el job si no se cumple.
-- **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; SonarQube Cloud para calidad de código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
-- **IE4 — Despliegue y trazabilidad:** publicación en GHCR etiquetada con SHA corto y labels OCI `revision`/`source`; despliegue de la misma etiqueta en `staging` y smoke test.
-- **IE5 — Orquestación:** Docker Compose coordina la aplicación, NGINX como proxy/balanceador y el servicio de pruebas. `APP_REPLICAS` configura las réplicas y el workflow aplica tres en staging.
-- **IE6 — Kubernetes, cumplimiento y bloqueo:** AKS ejecuta tres réplicas; Prometheus/Grafana muestran métricas y alertas; la auditoría automatizada y los escáneres bloquean el pipeline ante fallas.
+- **IE1 — Instrumentación:** `/metrics`, contadores, histograma y `X-Request-ID` en [`src/index.js`](src/index.js), con casos en [`test/basic.test.js`](test/basic.test.js).
+- **IE2 — Despliegue seguro en Kubernetes:** réplicas, probes, recursos, usuario no root y etiqueta de imagen por SHA en [`k8s/deployment.yaml`](k8s/deployment.yaml) y [`docs/kubernetes-aks.md`](docs/kubernetes-aks.md).
+- **IE3 — Dashboard y señales operacionales:** métricas de servicio/AKS y CI/CD en [`k8s/grafana-dashboard.yaml`](k8s/grafana-dashboard.yaml), descubrimiento en [`k8s/servicemonitor.yaml`](k8s/servicemonitor.yaml) y alertas en [`k8s/prometheus-rules.yaml`](k8s/prometheus-rules.yaml); instalación y Pushgateway en [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).
+- **IE4 — Documentación de observabilidad:** arquitectura, decisiones, runbook y seguimiento por `request_id` en [`docs/observabilidad-ep3.md`](docs/observabilidad-ep3.md).
+- **IE5 — Auditoría de cumplimiento:** controles ejecutables de manifiesto, Trivy, Snyk y cobertura en [`scripts/validate-compliance.js`](scripts/validate-compliance.js), usados por el job `security` de [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).
+- **IE6 — Falla crítica demostrable:** pasos reproducibles en [`scripts/demo-falla/README.md`](scripts/demo-falla/README.md) y evidencia esperada con espacios para capturas en [`docs/evidence.md`](docs/evidence.md); la rama `demo/falla-critica` se mantiene separada y sin fusionar.
 
 ## Política de calidad y seguridad
 
@@ -78,7 +82,7 @@ La pauta denomina los indicadores `IE1`–`IE6`:
 - SonarQube Cloud analiza calidad, mantenibilidad y seguridad estática según `sonar-project.properties`.
 - Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
 - Los jobs de build y despliegue dependen del job de seguridad exitoso.
-- La imagen se construye sin dependencias de runtime externas y corre como usuario no root.
+- La imagen de runtime contiene solo las dependencias de ejecución declaradas, incluido `prom-client`, y corre como usuario no root.
 - La etapa runtime elimina npm y npx, que no son necesarios para ejecutar el servicio; npm permanece disponible en la etapa de pruebas.
 - Compose limita memoria/CPU, elimina capabilities y activa `no-new-privileges`; los servicios de aplicación y NGINX usan filesystem de solo lectura.
 
@@ -102,13 +106,19 @@ La fase de observabilidad instala `kube-prometheus-stack` y configura:
 - Prometheus para recopilar `/metrics` mediante [`k8s/servicemonitor.yaml`](k8s/servicemonitor.yaml).
 - Grafana con un LoadBalancer público y el dashboard incluido en [`k8s/grafana-dashboard.yaml`](k8s/grafana-dashboard.yaml).
 - Alertas para indisponibilidad, tasa alta de errores y latencia p95 en [`k8s/prometheus-rules.yaml`](k8s/prometheus-rules.yaml).
+- Pushgateway (`pushgateway-prometheus-pushgateway`) para publicar cobertura, duración,
+  timestamp y resultado de `deploy-aks`. Su ServiceMonitor queda con `honorLabels: true`
+  para conservar `job="ci_cd_micro_demo"`.
+
+La arquitectura, los paneles, las consultas PromQL y el procedimiento de respuesta están
+documentados en [`docs/observabilidad-ep3.md`](docs/observabilidad-ep3.md).
 
 ## Ejecución local
 
 Requiere Node.js 24 o superior para ejecutar el proyecto directamente y Docker con Docker Compose para ejecutar el stack contenedorizado.
 
 ```bash
-# Instalar y verificar el proyecto (no hay dependencias de terceros)
+# Instalar las dependencias declaradas en package-lock.json
 npm ci
 
 # Ejecutar el servicio directamente en http://localhost:3000
@@ -171,37 +181,33 @@ Antes de ejecutar el pipeline en GitHub:
 2. Crear el GitHub Environment `staging`. El job `deploy` lo usa para identificar el destino de entrega.
 3. Dar acceso de lectura y escritura a GitHub Actions para publicar paquetes en GHCR. El workflow usa `GITHUB_TOKEN`; no requiere un token personal para publicar.
 4. Habilitar Dependabot alerts y security updates en la configuración del repositorio. Las actualizaciones semanales están declaradas en [.github/dependabot.yml](.github/dependabot.yml).
-5. Proteger `main` y exigir los checks `test` y `security` antes de aceptar cambios.
+5. Proteger `main` y exigir los checks `test`, `security` y `build-scan-push` antes de aceptar cambios.
 6. Integrar los cambios en `main`. Solo un `push` a esa rama publica la imagen y ejecuta el despliegue simulado.
 
 El job `deploy` levanta Docker Compose y verifica `/health` en el runner de GitHub Actions. Es un entorno cloud simulado y temporal: no es un servicio de staging persistente después de que termina el job. El SHA corto del commit identifica la imagen en GHCR y se reutiliza en el despliegue; los labels OCI guardan el SHA completo y el origen del repositorio.
 
-## Lista de verificación y evidencias para la entrega
+## Checklist y evidencias para la presentación
 
-La rama de entrega es `main`. Todo el trabajo está integrado en esa rama y el repositorio remoto contiene los cambios.
-
-- [x] La pareja integró el trabajo final en `main` y el repositorio remoto contiene los cambios.
-- [x] `SNYK_TOKEN` y `SONAR_TOKEN` configurados como secrets; el Environment `staging` creado; permisos de GHCR habilitados.
-- [x] Ejecución exitosa del workflow `CI/CD`: pruebas con cobertura de al menos 80%, análisis Snyk, Trivy y SonarQube Cloud, publicación de imagen en GHCR y despliegue con smoke test.
-- [x] Reflexión personal incluida en este README.
-- [x] Evidencia de ejecuciones, merges y verificaciones documentada en [docs/evidence.md](docs/evidence.md).
+Las verificaciones de infraestructura y las acciones que requieren intervención individual
+están en [`docs/checklist-presentacion.md`](docs/checklist-presentacion.md). El registro de
+evidencias EP3 está en [`docs/evidence.md`](docs/evidence.md).
 
 ## Uso de herramientas de apoyo
 
-Se utilizó GitHub Copilot como apoyo en tareas técnicas, como revisar la configuración del pipeline, mejorar la documentación y comprobar las pruebas. Los integrantes revisan y validan el resultado. Las reflexiones personales sobre el aprendizaje y la contribución son redactadas individualmente por cada integrante.
+Se utilizó GitHub Copilot como apoyo en tareas técnicas concretas: edición del pipeline
+CI/CD, configuración del dashboard de Grafana, documentación de observabilidad y creación/
+revisión de scripts de cobertura y cumplimiento. Los integrantes deben revisar y validar
+el resultado. Cita de la herramienta según la guía institucional:
+[CITA DE IA: completar según https://bibliotecas.duoc.cl/ia].
 
-## Conclusiones y reflexiones individuales
+## Reflexiones individuales
 
-### Reflexión de Angel Venegas
+### Reflexión EP3 de Angel
 
-Durante el desarrollo de esta evaluación me enfoqué principalmente en la contenerización y en la arquitectura de orquestación del microservicio. El diseño del Dockerfile con construcción multistage me permitió comprender cómo separar las herramientas de prueba del artefacto final de producción, reduciendo el peso de la imagen y aplicando directivas de seguridad como la ejecución con un usuario no root y la eliminación de binarios innecesarios en la etapa de runtime.
+(redactar sin IA)
 
-Asimismo, trabajar con Docker Compose para gestionar tres réplicas del servicio coordinadas bajo un balanceador NGINX me demostró la importancia de la alta disponibilidad y el desacoplamiento en sistemas distribuidos. La configuración de comprobaciones de salud (healthchecks) y límites de consumo de recursos tanto en local como en la automatización del pipeline me ayudó a entender cómo se asegura que el tráfico se dirija únicamente a instancias estables y listas para operar.
+### Reflexión EP3 de Israel
 
-## Reflexión de Isreel Poblete
-
-Durante el desarrollo de esta evaluación me enfoqué principalmente en la automatización del ciclo de validación y entrega del microservicio. Trabajar con las pruebas de Node.js y establecer un mínimo de 80% de cobertura me permitió comprender la importancia de comprobar que los cambios funcionen antes de integrarlos al proyecto. Además, la configuración de GitHub Actions me ayudó a relacionar las pruebas con los análisis de seguridad de Snyk, Trivy y SonarQube.
-
-También aprendí cómo una imagen Docker puede vincularse directamente con el commit que la originó mediante una etiqueta basada en el SHA. Esto permitió comprender mejor la trazabilidad del proceso, desde el código fuente hasta la publicación en GHCR y el despliegue con Docker Compose. Finalmente, la ejecución del smoke test sobre el endpoint /health reforzó la importancia de validar no solo el código, sino también el funcionamiento de la aplicación una vez desplegada.
+(redactar sin IA)
 
 

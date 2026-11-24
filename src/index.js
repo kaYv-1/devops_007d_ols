@@ -173,5 +173,3 @@ module.exports = {
   startServer,
   sum,
 };
-
-// Hotfix: correccion de puerto en produccion

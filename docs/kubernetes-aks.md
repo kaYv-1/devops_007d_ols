@@ -11,6 +11,7 @@ Azure Load Balancer.
 El workflow necesita estas variables y secretos:
 
 - Variables: `AKS_RESOURCE_GROUP` y `AKS_CLUSTER_NAME`.
+- Variable optativa para activar el job: `AKS_ENABLED=true`.
 - Secretos: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` y `AZURE_SUBSCRIPTION_ID`.
 
 La identidad federada de Azure debe permitir a GitHub Actions autenticarse
@@ -30,17 +31,24 @@ usa para crear el secreto de lectura de GHCR durante el despliegue.
 ## Flujo de despliegue
 
 El job `deploy-aks` se ejecuta en pushes a `main` cuando
-`vars.AKS_ENABLED` es `true`. El job:
+`vars.AKS_ENABLED` es `true`. Depende de la publicación de la imagen y del job
+`test`; este último publica `reports/coverage.txt` como artifact `coverage`. El job:
 
-1. Se autentica en Azure mediante OIDC.
-2. Obtiene el contexto del clúster AKS.
+1. Registra la hora de inicio y descarga el artifact de cobertura.
+2. Se autentica en Azure mediante OIDC y obtiene el contexto de AKS.
 3. Crea o actualiza el secreto de lectura de GHCR.
-4. Sustituye la etiqueta de imagen por el SHA corto del commit.
+4. Sustituye el marcador de imagen por la etiqueta SHA corta del commit.
 5. Aplica namespace, configuración, Deployment y Service.
-6. Instala Prometheus y Grafana con `kube-prometheus-stack`.
-7. Aplica el ServiceMonitor, las reglas de alerta y el dashboard.
-8. Espera el rollout de las tres réplicas.
-9. Espera la IP externa y ejecuta un smoke test contra `/health`.
+6. Instala Prometheus y Grafana con `kube-prometheus-stack`, y aplica
+   ServiceMonitor, reglas de alerta y dashboard.
+7. Instala Pushgateway con el release `pushgateway` del chart versión `3.11.2`,
+   `ServiceMonitor` habilitado y `honorLabels: true`.
+8. Comprueba el nombre real del Service (`pushgateway-prometheus-pushgateway`),
+   el label `release: kube-prometheus-stack` y el valor `honorLabels`.
+9. Espera el rollout de tres réplicas.
+10. Espera la IP externa y ejecuta el smoke test de `/health`.
+11. Después del smoke test, calcula la duración y publica cobertura, duración,
+    timestamp y resultado 1/0 en `/metrics/job/ci_cd_micro_demo` por port-forward.
 
 ## Observabilidad
 
@@ -49,12 +57,17 @@ recolecta `/metrics` cada 30 segundos. Las métricas disponibles incluyen
 solicitudes totales, errores, duración HTTP, memoria y CPU.
 
 El dashboard se carga automáticamente en Grafana mediante el sidecar de
-dashboards. Muestra solicitudes por segundo, errores por segundo, latencia
-p95 y memoria RSS. Las reglas de Prometheus generan alertas para:
+dashboards. Conserva solicitudes por segundo, errores por segundo, latencia
+p95 y memoria RSS; agrega CPU y memoria de trabajo por pod, duración del último
+despliegue, cobertura de pruebas, errores de la última hora y disponibilidad.
+El gauge de cobertura cambia a rojo bajo 80%. Las reglas de Prometheus generan alertas para:
 
 - servicio no disponible;
 - más del 5 % de solicitudes con error;
 - latencia p95 superior a 1 segundo.
+
+La guía de consultas PromQL y el runbook están en
+[`observabilidad-ep3.md`](observabilidad-ep3.md).
 
 Para consultar Grafana:
 
