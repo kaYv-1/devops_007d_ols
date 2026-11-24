@@ -10,6 +10,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "lodash": "4.17.15",
     "prom-client": "^15.1.3"
   }
 }
