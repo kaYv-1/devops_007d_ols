@@ -8,18 +8,26 @@ const outputFile = path.join(reportsDir, 'test-report.html');
 
 fs.mkdirSync(reportsDir, { recursive: true });
 
-const testResult = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'test/basic.test.js'], {
-  cwd: root,
-  encoding: 'utf8',
-});
+const fromStdin = process.argv.includes('--from-stdin');
+let testResult = { status: 0, stdout: '', stderr: '' };
+
+if (fromStdin) {
+  testResult.stdout = fs.readFileSync(0, 'utf8');
+} else {
+  testResult = spawnSync(process.execPath, ['--test', '--test-reporter=tap', 'test/basic.test.js'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+
+  if (testResult.stdout) {
+    process.stdout.write(testResult.stdout);
+  }
+  if (testResult.stderr) {
+    process.stderr.write(testResult.stderr);
+  }
+}
 
 const stdout = `${testResult.stdout || ''}${testResult.stderr || ''}`;
-if (testResult.stdout) {
-  process.stdout.write(testResult.stdout);
-}
-if (testResult.stderr) {
-  process.stderr.write(testResult.stderr);
-}
 const rows = [];
 const lines = stdout.split(/\r?\n/);
 let pendingRow = null;
