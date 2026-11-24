@@ -38,8 +38,8 @@ flowchart LR
 
 ### Jobs
 
-- `test`: se ejecuta en todos los pushes y en los pull requests dirigidos a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y publica los reportes HTML y `reports/coverage.txt` como artifacts.
-- `security`: depende de `test`; analiza dependencias y código con Snyk y ejecuta Trivy sobre el filesystem. Detecciones `HIGH`/`CRITICAL` bloquean los jobs siguientes.
+- `test`: se ejecuta en todos los pushes y en los pull requests dirigidos a `main`; corre los tests con el runner nativo de Node, exige al menos 80% de cobertura de líneas y publica los reportes HTML, `reports/coverage.txt` y `coverage/lcov.info` como artifacts.
+- `security`: depende de `test`; descarga el reporte LCOV, analiza dependencias y código con Snyk, ejecuta Trivy sobre el filesystem y espera el Quality Gate de SonarQube Cloud. Los controles fallidos bloquean los jobs siguientes.
 - `build-scan-push`: solo en push a `main`; construye la imagen con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto del commit.
 - `deploy`: solo después de publicar la imagen; selecciona el entorno GitHub `staging`, descarga esa misma imagen por SHA, la levanta con Compose y ejecuta un smoke test HTTP.
 - `deploy-aks`: descarga el artifact de cobertura, mide el tiempo del job, despliega en Azure Kubernetes Service, instala Prometheus/Grafana y Pushgateway, y publica métricas de CI/CD después del smoke test.
@@ -80,6 +80,7 @@ La implementación EP3 se organiza alrededor de los indicadores `IE1`–`IE6`:
 - Al menos 80% de cobertura de líneas; pruebas fallidas o cobertura insuficiente fallan `npm test` y el job `test`.
 - Snyk aplica el umbral `high` a dependencias y análisis de código.
 - SonarQube Cloud analiza calidad, mantenibilidad y seguridad estática según `sonar-project.properties`.
+- El análisis Sonar importa `coverage/lcov.info` y espera el resultado del Quality Gate antes de dar por exitoso el job `security`.
 - Trivy usa `HIGH,CRITICAL` y `exit-code: 1` para filesystem e imagen.
 - Los jobs de build y despliegue dependen del job de seguridad exitoso.
 - La imagen de runtime contiene solo las dependencias de ejecución declaradas, incluido `prom-client`, y corre como usuario no root.

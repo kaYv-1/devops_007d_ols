@@ -50,10 +50,10 @@ Métricas publicadas por el pipeline:
 
 | Herramienta | Etapa del pipeline | Métrica o control | Decisión técnica que habilita |
 |---|---|---|---|
-| Node Test Runner | `test` | Cobertura de líneas en `reports/coverage.txt` | Si cobertura <80%, el job falla y la protección de rama impide integrar el cambio. |
+| Node Test Runner | `test` | Cobertura de líneas en `reports/coverage.txt` y `coverage/lcov.info` | Si cobertura <80%, el job falla; el LCOV se entrega a SonarQube Cloud y la protección de rama puede impedir integrar el cambio. |
 | Snyk | `security` | Vulnerabilidades HIGH/CRITICAL en dependencias y código | No se autoriza el build y publicación mientras exista una vulnerabilidad sobre el umbral. |
 | Trivy | `security` y `build-scan-push` | Filesystem e imagen; severidades HIGH/CRITICAL con `exit-code: "1"` | Si Trivy encuentra HIGH/CRITICAL, no se publica la imagen en GHCR. |
-| SonarQube Cloud | `security` | Calidad y análisis estático del cambio | Informa hallazgos del código antes de integrar; revisar el Quality Gate configurado en el repositorio. |
+| SonarQube Cloud | `security` | Análisis estático, cobertura LCOV y Quality Gate | El scanner espera el Quality Gate; si no pasa, `security` falla y bloquea los jobs posteriores. |
 | `validate-compliance.js` | `security` | Tag de imagen, recursos, usuario no root, probes y umbrales de análisis | Cualquier control ausente o inválido hace fallar `security`. |
 | GitHub Actions | `test`, `security`, `build-scan-push`, `deploy-aks` | Estados de jobs y artifact de cobertura | Los jobs posteriores requieren los predecesores exitosos; checks fallidos bloquean el merge cuando la protección manual esté habilitada. |
 | kube-prometheus-stack | `deploy-aks` y operación | `up`, errores HTTP, P95, CPU y memoria por pod | Si P95 >1 s, investigar carga, errores, recursos y logs; considerar rollback si el cambio coincide con la degradación. |

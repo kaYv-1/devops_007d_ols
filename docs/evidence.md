@@ -55,7 +55,7 @@ Ejecutada el 2026-11-24, hora local `-03:00`, desde la rama
 
 | Comando | Resultado | Salida generada |
 |---|---|---|
-| `npm.cmd test` | 12/12 pruebas; cobertura de líneas 88.00% (mínimo 80%). | `reports/coverage.txt` contiene `88.00`; `reports/test-report.html`. |
+| `npm.cmd test` | 12/12 pruebas; cobertura de líneas 88.00% (mínimo 80%). | `reports/coverage.txt` contiene `88.00`; `coverage/lcov.info` contiene registros LCOV; `reports/test-report.html`. |
 | `npm.cmd audit` | 0 vulnerabilidades en la rama de trabajo. | Salida de auditoría en terminal. |
 | `node scripts/validate-compliance.js` | 8/8 controles PASS. | Tabla impresa en terminal. |
 | `actionlint .github/workflows/ci-cd.yml` | Exit code 0; workflow sin diagnósticos. | Validación en terminal. |
