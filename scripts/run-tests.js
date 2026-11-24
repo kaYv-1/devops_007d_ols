@@ -21,6 +21,16 @@ const testResult = spawnSync(process.execPath, [
   encoding: 'utf8',
 });
 
+if (fs.existsSync(lcovPath)) {
+  const lcovReport = fs.readFileSync(lcovPath, 'utf8');
+  const normalizedLcovReport = lcovReport.replace(/^SF:(.+)$/gm, (_, sourcePath) => {
+    const platformPath = sourcePath.replace(/[\\/]/g, path.sep);
+    const relativePath = path.relative(root, path.resolve(root, platformPath));
+    return `SF:${relativePath.split(path.sep).join('/')}`;
+  });
+  fs.writeFileSync(lcovPath, normalizedLcovReport, 'utf8');
+}
+
 if (testResult.stdout) { // salidda de las pruebas
   process.stdout.write(testResult.stdout);
 }
@@ -32,6 +42,7 @@ const coverageMatch = (testResult.stdout || '').match(/^#\s*all files\s*\|\s*([\
 const coveragePercent = coverageMatch ? Number.parseFloat(coverageMatch[1]) : 0;
 const lcovReport = fs.existsSync(lcovPath) ? fs.readFileSync(lcovPath, 'utf8') : '';
 const hasLcovReport = /^TN:.*\r?\nSF:.+\r?\n/m.test(lcovReport)
+  && /^SF:src\/index\.js$/m.test(lcovReport)
   && /\r?\nDA:\d+,\d+/m.test(lcovReport)
   && /end_of_record/.test(lcovReport);
 console.log(`\nCobertura de líneas: ${coveragePercent.toFixed(2)}% (mínimo requerido: ${MINIMUM_COVERAGE_PERCENT}%)`);

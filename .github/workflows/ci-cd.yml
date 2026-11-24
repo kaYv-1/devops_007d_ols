@@ -44,7 +44,14 @@ jobs:
           name: coverage
           path: |
             reports/coverage.txt
-            coverage/lcov.info
+          if-no-files-found: error
+
+      - name: Publicar reporte LCOV para SonarQube Cloud
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: coverage/lcov.info
           if-no-files-found: error
 
       - name: Publicar reporte HTML
@@ -68,8 +75,8 @@ jobs:
       - name: Descargar artifact de cobertura para SonarQube Cloud
         uses: actions/download-artifact@v4
         with:
-          name: coverage
-          path: .
+          name: lcov
+          path: coverage
 
       - name: Verificar reporte LCOV
         run: |
@@ -114,7 +121,12 @@ jobs:
           exit-code: "1"
 
       - name: Analizar calidad con SonarQube Cloud
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
