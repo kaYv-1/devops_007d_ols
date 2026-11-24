@@ -195,11 +195,15 @@ evidencias EP3 está en [`docs/evidence.md`](docs/evidence.md).
 
 ## Uso de herramientas de apoyo
 
-Se utilizó GitHub Copilot como apoyo en tareas técnicas concretas: edición del pipeline
-CI/CD, configuración del dashboard de Grafana, documentación de observabilidad y creación/
-revisión de scripts de cobertura y cumplimiento. Los integrantes deben revisar y validar
-el resultado. Cita de la herramienta según la guía institucional:
-[CITA DE IA: completar según https://bibliotecas.duoc.cl/ia].
+GitHub Copilot se utilizó como apoyo acotado en tareas básicas y automatizables:
+ordenar documentación, proponer ajustes de configuración CI/CD y apoyar la revisión
+de scripts. El equipo revisó las sugerencias y verificó los resultados con pruebas
+automatizadas (`npm test`) y controles de cumplimiento
+(`node scripts/validate-compliance.js`). Las decisiones finales y las reflexiones
+individuales son responsabilidad de los integrantes; no se usó IA para redactar
+las reflexiones personales.
+
+Referencia: Biblioteca Duoc UC, [Inteligencia Artificial: IA](https://bibliotecas.duoc.cl/ia).
 
 ## Reflexiones individuales
 
