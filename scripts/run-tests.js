@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+const MINIMUM_COVERAGE_PERCENT = 80;
+
 const coverageDir = path.join(root, 'coverage'); // ejecucion de las pruebas
 fs.mkdirSync(coverageDir, { recursive: true });
 const testResult = spawnSync(process.execPath, [
@@ -27,7 +29,15 @@ if (testResult.stderr) { // salida de las pruebas
 
 const coverageMatch = (testResult.stdout || '').match(/^#\s*all files\s*\|\s*([\d.]+)/im);
 const coveragePercent = coverageMatch ? Number.parseFloat(coverageMatch[1]) : 0;
-console.log(`\nCobertura de líneas: ${coveragePercent.toFixed(2)}% (mínimo requerido: 80%)`);
+console.log(`\nCobertura de líneas: ${coveragePercent.toFixed(2)}% (mínimo requerido: ${MINIMUM_COVERAGE_PERCENT}%)`);
+
+const reportsDir = path.join(root, 'reports');
+fs.mkdirSync(reportsDir, { recursive: true });
+fs.writeFileSync(
+  path.join(reportsDir, 'coverage.txt'),
+  `${coveragePercent.toFixed(2)}\n`,
+  'utf8',
+);
 
 const reportResult = spawnSync(process.execPath, [path.join(root, 'scripts', 'generate-report.js'), '--from-stdin'], { // ejecucion que genera reportes
   cwd: root,
@@ -42,6 +52,6 @@ if (reportResult.stderr) { // salida de la generacion de reportes
   process.stderr.write(reportResult.stderr);
 }
 
-if (testResult.status !== 0 || reportResult.status !== 0 || !coverageMatch || coveragePercent < 80) { // validacion final
+if (testResult.status !== 0 || reportResult.status !== 0 || !coverageMatch || coveragePercent < MINIMUM_COVERAGE_PERCENT) { // validacion final
   process.exitCode = 1;
 }

@@ -37,6 +37,14 @@ jobs:
       - name: Ejecutar pruebas y umbral de cobertura
         run: npm test
 
+      - name: Publicar cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: reports/coverage.txt
+          if-no-files-found: error
+
       - name: Publicar reporte HTML
         if: always()
         uses: actions/upload-artifact@v4
@@ -209,7 +217,7 @@ jobs:
 
   deploy-aks:
     name: deploy-aks
-    needs: build-scan-push
+    needs: [test, build-scan-push]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AKS_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -219,8 +227,30 @@ jobs:
     environment:
       name: staging
     steps:
+      - name: Registrar inicio del despliegue
+        run: echo "DEPLOY_START_SECONDS=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Descargar repositorio
         uses: actions/checkout@v4
+
+      - name: Descargar artifact de cobertura
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: reports
+
+      - name: Validar cobertura descargada
+        run: |
+          if [ ! -s reports/coverage.txt ]; then
+            echo "No se encontró reports/coverage.txt en el artifact coverage." >&2
+            exit 1
+          fi
+          COVERAGE_PERCENT="$(tr -d '[:space:]' < reports/coverage.txt)"
+          if ! [[ "$COVERAGE_PERCENT" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+            echo "El artifact de cobertura no contiene un porcentaje numérico." >&2
+            exit 1
+          fi
+          echo "TEST_COVERAGE_PERCENT=$COVERAGE_PERCENT" >> "$GITHUB_ENV"
 
       - name: Autenticar en Azure mediante OIDC
         uses: azure/login@v2
@@ -252,7 +282,7 @@ jobs:
           OWNER_LC="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           REPOSITORY_LC="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
           IMAGE_REF="ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${GITHUB_SHA::7}"
-          sed -i "s|ghcr.io/kayv-1/devops_007d_ols:latest|$IMAGE_REF|g" k8s/deployment.yaml
+          sed -i "s|ghcr.io/kayv-1/devops_007d_ols:sha-placeholder|$IMAGE_REF|g" k8s/deployment.yaml
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/configmap.yaml
           kubectl apply -f k8s/deployment.yaml
@@ -275,7 +305,43 @@ jobs:
           kubectl apply -f k8s/prometheus-rules.yaml
           kubectl apply -f k8s/grafana-dashboard.yaml
 
+      - name: Instalar Pushgateway y validar ServiceMonitor
+        run: |
+          helm upgrade --install pushgateway prometheus-community/prometheus-pushgateway \
+            --namespace monitoring \
+            --version 3.11.2 \
+            --set serviceMonitor.enabled=true \
+            --set serviceMonitor.namespace=monitoring \
+            --set serviceMonitor.additionalLabels.release=kube-prometheus-stack \
+            --set serviceMonitor.honorLabels=true \
+            --wait --timeout=5m
+
+          PUSHGATEWAY_SERVICE="$(kubectl get service \
+            --namespace monitoring \
+            --selector app.kubernetes.io/instance=pushgateway,app.kubernetes.io/name=prometheus-pushgateway \
+            --output jsonpath='{.items[0].metadata.name}')"
+          if [ "$PUSHGATEWAY_SERVICE" != "pushgateway-prometheus-pushgateway" ]; then
+            echo "Nombre inesperado del Service Pushgateway: ${PUSHGATEWAY_SERVICE:-vacío}" >&2
+            kubectl get service --namespace monitoring --show-labels
+            exit 1
+          fi
+          kubectl get service "$PUSHGATEWAY_SERVICE" --namespace monitoring
+
+          SERVICE_MONITOR=pushgateway-prometheus-pushgateway
+          MONITOR_LABEL="$(kubectl get servicemonitor "$SERVICE_MONITOR" \
+            --namespace monitoring \
+            --output jsonpath='{.metadata.labels.release}')"
+          HONOR_LABELS="$(kubectl get servicemonitor "$SERVICE_MONITOR" \
+            --namespace monitoring \
+            --output jsonpath='{.spec.endpoints[0].honorLabels}')"
+          if [ "$MONITOR_LABEL" != "kube-prometheus-stack" ] || [ "$HONOR_LABELS" != "true" ]; then
+            echo "ServiceMonitor inválido: release=${MONITOR_LABEL:-vacío}, honorLabels=${HONOR_LABELS:-vacío}" >&2
+            exit 1
+          fi
+          echo "PUSHGATEWAY_SERVICE=$PUSHGATEWAY_SERVICE" >> "$GITHUB_ENV"
+
       - name: Esperar rollout
+        id: rollout
         run: kubectl rollout status deployment/micro-demo --namespace devops-staging --timeout=180s
 
       - name: Diagnosticar rollout de AKS
@@ -311,6 +377,7 @@ jobs:
           exit 1
 
       - name: Smoke test de AKS
+        id: smoke-test
         run: |
           for attempt in {1..20}; do
             if curl --fail --silent "http://${EXTERNAL_IP}/health"; then
@@ -320,6 +387,68 @@ jobs:
           done
           kubectl get pods,service -n devops-staging -o wide
           exit 1
+
+      - name: Publicar métricas de CI/CD en Pushgateway
+        if: always()
+        env:
+          DEPLOY_START_SECONDS: ${{ env.DEPLOY_START_SECONDS }}
+          TEST_COVERAGE_PERCENT: ${{ env.TEST_COVERAGE_PERCENT }}
+          PUSHGATEWAY_SERVICE: ${{ env.PUSHGATEWAY_SERVICE }}
+        run: |
+          set -euo pipefail
+          DEPLOY_FINISH_SECONDS="$(date +%s)"
+          if [ -z "${DEPLOY_START_SECONDS:-}" ]; then
+            echo "No se registró la hora de inicio del job." >&2
+            exit 1
+          fi
+          if [ -z "${TEST_COVERAGE_PERCENT:-}" ]; then
+            echo "No se descargó un porcentaje de cobertura válido." >&2
+            exit 1
+          fi
+          DEPLOY_DURATION_SECONDS=$((DEPLOY_FINISH_SECONDS - DEPLOY_START_SECONDS))
+          DEPLOY_SUCCESS=0
+          if [[ '${{ steps.rollout.outcome }}' == 'success' && '${{ steps.smoke-test.outcome }}' == 'success' ]]; then
+            DEPLOY_SUCCESS=1
+          fi
+
+          if [ -z "${PUSHGATEWAY_SERVICE:-}" ]; then
+            echo "No se verificó el Service de Pushgateway." >&2
+            exit 1
+          fi
+          kubectl get service "$PUSHGATEWAY_SERVICE" --namespace monitoring
+
+          PORT_FORWARD_LOG="$RUNNER_TEMP/pushgateway-port-forward.log"
+          kubectl port-forward --namespace monitoring \
+            "service/$PUSHGATEWAY_SERVICE" 19091:9091 > "$PORT_FORWARD_LOG" 2>&1 &
+          PORT_FORWARD_PID=$!
+          trap 'kill "$PORT_FORWARD_PID" 2>/dev/null || true; wait "$PORT_FORWARD_PID" 2>/dev/null || true' EXIT
+
+          READY=0
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:19091/-/ready >/dev/null; then
+              READY=1
+              break
+            fi
+            if ! kill -0 "$PORT_FORWARD_PID" 2>/dev/null; then
+              cat "$PORT_FORWARD_LOG" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$READY" -ne 1 ]; then
+            cat "$PORT_FORWARD_LOG" >&2
+            echo "Pushgateway no respondió al port-forward." >&2
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --request PUT \
+            --data-binary @- \
+            http://127.0.0.1:19091/metrics/job/ci_cd_micro_demo <<EOF
+          ci_deploy_duration_seconds ${DEPLOY_DURATION_SECONDS}
+          ci_test_coverage_percent ${TEST_COVERAGE_PERCENT}
+          ci_last_deploy_timestamp_seconds ${DEPLOY_FINISH_SECONDS}
+          ci_last_deploy_success ${DEPLOY_SUCCESS}
+          EOF
 
   alert:
     name: alert
