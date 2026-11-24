@@ -19,7 +19,7 @@ El pipeline está definido en [`.github/workflows/ci-cd.yml`](.github/workflows/
 
 ```mermaid
 flowchart LR
-    A[Push o pull request] --> B[Test Node.js 20]
+    A[Push o pull request] --> B[Test Node.js 24]
     B --> C[Seguridad: Snyk y Trivy]
     C --> D[Build Docker en main]
     D --> E[Escaneo Trivy de imagen]
@@ -46,7 +46,7 @@ Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `te
 
 | Paso | Implementación |
 |---|---|
-| 01. Dockerfile | [Dockerfile](Dockerfile): build multistage, `node:20-alpine`, `USER node`, `EXPOSE` y `HEALTHCHECK`. [.dockerignore](.dockerignore) excluye archivos innecesarios del contexto de construcción. |
+| 01. Dockerfile | [Dockerfile](Dockerfile): build multistage, `node:24-alpine3.24`, `USER node`, `EXPOSE` y `HEALTHCHECK`. [.dockerignore](.dockerignore) excluye archivos innecesarios del contexto de construcción. |
 | 02. Compose | [compose.yaml](compose.yaml) ejecuta `app`, `nginx` y el servicio de prueba por perfil. |
 | 03. Variables | `.env` local basado en [.env.example](.env.example); `.env` está excluido en [.gitignore](.gitignore). |
 | 04. Healthchecks | Healthchecks HTTP para `app` y `nginx` en [compose.yaml](compose.yaml). |
@@ -95,7 +95,7 @@ test está documentada en [`docs/kubernetes-aks.md`](docs/kubernetes-aks.md).
 
 ## Ejecución local
 
-Requiere Node.js 20 o superior para ejecutar el proyecto directamente y Docker con Docker Compose para ejecutar el stack contenedorizado.
+Requiere Node.js 24 o superior para ejecutar el proyecto directamente y Docker con Docker Compose para ejecutar el stack contenedorizado.
 
 ```bash
 # Instalar y verificar el proyecto (no hay dependencias de terceros)
