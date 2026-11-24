@@ -125,6 +125,7 @@ test('el servidor puede iniciar y apagarse ordenadamente', async () => {
   });
   shutdown();
   await closed;
+  assert.strictEqual(testServer.listening, false);
 
   process.removeListener('SIGINT', shutdown);
   process.removeListener('SIGTERM', shutdown);
