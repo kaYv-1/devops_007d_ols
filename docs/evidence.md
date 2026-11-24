@@ -60,10 +60,25 @@ Ejecutada el 2026-11-24, hora local `-03:00`, desde la rama
 | `node scripts/validate-compliance.js` | 8/8 controles PASS. | Tabla impresa en terminal. |
 | `actionlint .github/workflows/ci-cd.yml` | Exit code 0; workflow sin diagnósticos. | Validación en terminal. |
 
-Estos resultados son ejecuciones locales, no acreditan un run de GitHub Actions
-ni una instalación en AKS. El artifact de Actions y los paneles con métricas
-reales quedan pendientes de una ejecución con los secretos, variables y clúster
-configurados por el equipo.
+## Ejecución real del workflow de GitHub
+
+El 2026-11-24, el push del commit `93ea027` en
+[`feature/ep3-observability`](https://github.com/kaYv-1/devops_007d_ols/actions/runs/45428622007)
+terminó con conclusión `success`: `test` y `security` pasaron; el artifact
+`coverage` se publicó. `build-scan-push`, `deploy` y `deploy-aks` quedaron
+`skipped` por sus condiciones de ejecución en `main` y la variable
+`AKS_ENABLED`; este run no verifica el despliegue en AKS.
+
+El push del commit `b985348` en
+[`demo/falla-critica`](https://github.com/kaYv-1/devops_007d_ols/actions/runs/45428621730)
+terminó con conclusión `failure`: `test` pasó; `security` falló en el análisis
+de dependencias Snyk por 5 hallazgos HIGH en `lodash@4.17.15`; los trabajos
+`build-scan-push`, `deploy` y `deploy-aks` quedaron `skipped` por sus condiciones
+de rama `main`/`AKS_ENABLED`. El job `alert` terminó correctamente y abrió el
+issue [#61](https://github.com/kaYv-1/devops_007d_ols/issues/61). El check local
+Trivy documentado abajo también terminó con exit code 1. No se abrió PR para la
+demo, por lo que la comprobación de checks de PR y el bloqueo por protección de
+`main` siguen pendientes.
 
 ## Comandos de evidencia
 
@@ -121,11 +136,10 @@ Ejecutada el 2026-11-24 sobre el commit `b985348` de `demo/falla-critica`:
 | `npm.cmd audit` | Exit code 1; 1 vulnerabilidad HIGH para `lodash <=4.17.23`. |
 | `npm.cmd test` | 11/11 pruebas; cobertura de líneas 88.14%. |
 
-La falla local del escaneo Trivy confirma el bloqueo de la clase configurada en
-`security`; no equivale a una ejecución del workflow en GitHub. Snyk no se ejecutó
-localmente y la prueba de Actions/issue requiere publicar la rama con acceso al
-repositorio. El equipo debe completar las capturas numeradas tras la ejecución
-remota.
+El run remoto confirma el fallo del job `security` por Snyk; la acción Trivy no
+se ejecutó en ese run porque el paso anterior ya había fallado. La prueba local
+Trivy encontró los hallazgos y finalizó con exit code 1. El equipo debe completar
+las capturas de PR y protección de `main` cuando realice esa demostración.
 
 ## Reflexiones individuales
 
