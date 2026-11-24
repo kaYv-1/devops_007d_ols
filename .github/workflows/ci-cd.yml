@@ -55,6 +55,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validar requisitos de observabilidad y cumplimiento
+        run: node scripts/validate-compliance.js
+
       - name: Validar configuración del token de Snyk
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
