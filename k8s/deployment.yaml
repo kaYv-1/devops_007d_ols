@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: micro-demo
-          image: ghcr.io/kayv-1/devops_007d_ols:latest
+          image: ghcr.io/kayv-1/devops_007d_ols:sha-placeholder
           imagePullPolicy: Always
           ports:
             - name: http
