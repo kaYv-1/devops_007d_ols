@@ -121,6 +121,7 @@ jobs:
           exit-code: "1"
 
       - name: Analizar calidad con SonarQube Cloud
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >

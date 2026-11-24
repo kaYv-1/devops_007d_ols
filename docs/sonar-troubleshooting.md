@@ -6,6 +6,11 @@ antes del escaneo. `scripts/run-tests.js` conserva el reporte TAP y el umbral
 local de cobertura, y normaliza las rutas `SF:` de LCOV a rutas relativas con
 separadores `/`, como `src/index.js`.
 
+El análisis Sonar se ejecuta en pull requests dirigidos a `main` y en pushes a
+`main`. Los pushes directos a ramas secundarias no se analizan porque la
+organización de SonarQube Cloud no permite consultar Quality Gates para ramas
+que no son la principal; el análisis de pull request conserva el Quality Gate.
+
 ## Comprobaciones manuales pendientes
 
 Estas comprobaciones requieren acceso a la configuración web de GitHub o
