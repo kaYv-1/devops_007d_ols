@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
 const { createServer, parsePort, server, startServer, sum } = require('../src/index.js');
 
 test('sum suma dos numeros correctamente', () => {
@@ -38,6 +40,34 @@ test('GET /metrics expone métricas Prometheus', async () => {
     assert.match(response.body, /micro_demo_http_requests_total/);
     assert.match(response.body, /micro_demo_http_request_duration_seconds/);
   });
+});
+
+test('el dashboard conserva los paneles base y agrega señales de EP3', () => {
+  const dashboardPath = path.resolve(__dirname, '..', 'k8s', 'grafana-dashboard.yaml');
+  const dashboardYaml = fs.readFileSync(dashboardPath, 'utf8');
+  const marker = '  micro-demo.json: |';
+  const markerIndex = dashboardYaml.indexOf(marker);
+
+  assert.notStrictEqual(markerIndex, -1);
+  const block = dashboardYaml.slice(markerIndex + marker.length).replace(/^\r?\n/, '');
+  const jsonLines = block.split(/\r?\n/)
+    .filter((line) => line.startsWith('    '))
+    .map((line) => line.slice(4));
+  const dashboard = JSON.parse(jsonLines.join('\n'));
+  const panels = new Map(dashboard.panels.map((panel) => [panel.title, panel]));
+
+  assert.strictEqual(dashboard.panels.length, 10);
+  assert.ok(panels.has('Solicitudes por segundo'));
+  assert.ok(panels.has('Errores HTTP por segundo'));
+  assert.ok(panels.has('Latencia p95'));
+  assert.ok(panels.has('Memoria RSS'));
+  assert.match(panels.get('CPU por pod').targets[0].expr, /container_cpu_usage_seconds_total/);
+  assert.match(panels.get('Memoria de trabajo por pod').targets[0].expr, /container_memory_working_set_bytes/);
+  assert.strictEqual(panels.get('Cobertura de pruebas').type, 'gauge');
+  const coverageThresholds = panels.get('Cobertura de pruebas').fieldConfig.defaults.thresholds.steps;
+  assert.strictEqual(coverageThresholds[0].color, 'red');
+  assert.strictEqual(coverageThresholds[1].value, 80);
+  assert.strictEqual(panels.get('Disponibilidad (up)').targets[0].expr, 'avg(up{namespace="devops-staging",service="micro-demo"})');
 });
 
 test('un método distinto de GET devuelve 405', async () => {
