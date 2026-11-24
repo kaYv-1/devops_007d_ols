@@ -184,6 +184,12 @@ jobs:
           docker compose pull app
           docker compose up -d --no-build --scale app=3
 
+      - name: Mostrar diagnóstico de Compose
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color app nginx || true
+
       - name: Smoke test
         run: |
           for attempt in {1..20}; do

@@ -15,8 +15,17 @@ El workflow necesita estas variables y secretos:
 
 La identidad federada de Azure debe permitir a GitHub Actions autenticarse
 mediante OIDC y tener permisos `Azure Kubernetes Service Cluster User Role`
-sobre el clúster. El token `GITHUB_TOKEN` se usa para crear el secreto de
-lectura de GHCR durante el despliegue.
+sobre el clúster. Para este repositorio y el Environment `staging`, la
+credencial federada debe usar:
+
+- Issuer: `https://token.actions.githubusercontent.com`.
+- Audience: `api://AzureADTokenExchange`.
+- Subject: `repo:kaYv-1@173298876/devops_007d_ols@1338805463:environment:staging`.
+
+El `subject` debe coincidir exactamente con el que muestra el error de
+`azure/login`; no se debe sustituir por el formato genérico
+`repo:kaYv-1/devops_007d_ols:environment:staging`. El token `GITHUB_TOKEN` se
+usa para crear el secreto de lectura de GHCR durante el despliegue.
 
 ## Flujo de despliegue
 
