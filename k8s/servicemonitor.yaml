@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: micro-demo
+  namespace: devops-staging
+  labels:
+    app.kubernetes.io/name: micro-demo
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: micro-demo
+  namespaceSelector:
+    matchNames:
+      - devops-staging
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

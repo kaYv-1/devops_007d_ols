@@ -37,8 +37,32 @@ El job `deploy-aks` se ejecuta en pushes a `main` cuando
 3. Crea o actualiza el secreto de lectura de GHCR.
 4. Sustituye la etiqueta de imagen por el SHA corto del commit.
 5. Aplica namespace, configuración, Deployment y Service.
-6. Espera el rollout de las tres réplicas.
-7. Espera la IP externa y ejecuta un smoke test contra `/health`.
+6. Instala Prometheus y Grafana con `kube-prometheus-stack`.
+7. Aplica el ServiceMonitor, las reglas de alerta y el dashboard.
+8. Espera el rollout de las tres réplicas.
+9. Espera la IP externa y ejecuta un smoke test contra `/health`.
 
-Las anotaciones `prometheus.io/*` dejan preparado el scraping de
-`/metrics` para la siguiente fase.
+## Observabilidad
+
+El `ServiceMonitor` descubre el puerto `http` del Service `micro-demo` y
+recolecta `/metrics` cada 30 segundos. Las métricas disponibles incluyen
+solicitudes totales, errores, duración HTTP, memoria y CPU.
+
+El dashboard se carga automáticamente en Grafana mediante el sidecar de
+dashboards. Muestra solicitudes por segundo, errores por segundo, latencia
+p95 y memoria RSS. Las reglas de Prometheus generan alertas para:
+
+- servicio no disponible;
+- más del 5 % de solicitudes con error;
+- latencia p95 superior a 1 segundo.
+
+Para consultar Grafana:
+
+```bash
+kubectl get service -n monitoring
+kubectl get secret -n monitoring kube-prometheus-stack-grafana \
+  -o jsonpath="{.data.admin-password}" | base64 --decode
+```
+
+Abre la IP externa del servicio `kube-prometheus-stack-grafana` y usa el
+usuario `admin` con la contraseña obtenida arriba.

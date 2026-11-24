@@ -1,0 +1,42 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: micro-demo-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: micro-demo
+      rules:
+        - alert: MicroDemoUnavailable
+          expr: sum(up{service="micro-demo"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Micro-demo no está disponible"
+            description: "Ninguna instancia de micro-demo responde en /metrics."
+        - alert: MicroDemoHighErrorRate
+          expr: |
+            sum(rate(micro_demo_http_errors_total[5m]))
+              /
+            clamp_min(sum(rate(micro_demo_http_requests_total[5m])), 1) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Alto porcentaje de errores HTTP"
+            description: "Más del 5 % de las solicitudes tienen estado HTTP 4xx/5xx."
+        - alert: MicroDemoHighLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(micro_demo_http_request_duration_seconds_bucket[5m])) by (le)
+            ) > 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Latencia alta"
+            description: "El percentil 95 de latencia supera 1 segundo."

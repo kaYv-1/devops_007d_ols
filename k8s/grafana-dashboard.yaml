@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: micro-demo-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  micro-demo.json: |
+    {
+      "title": "Micro Demo - DevOps",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "panels": [
+        {
+          "title": "Solicitudes por segundo",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "targets": [{"expr": "sum(rate(micro_demo_http_requests_total[5m]))"}]
+        },
+        {
+          "title": "Errores HTTP por segundo",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "targets": [{"expr": "sum(rate(micro_demo_http_errors_total[5m]))"}]
+        },
+        {
+          "title": "Latencia p95",
+          "type": "timeseries",
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+          "targets": [{"expr": "histogram_quantile(0.95, sum(rate(micro_demo_http_request_duration_seconds_bucket[5m])) by (le))"}]
+        },
+        {
+          "title": "Memoria RSS",
+          "type": "timeseries",
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+          "targets": [{"expr": "sum(micro_demo_process_resident_memory_bytes)"}]
+        }
+      ]
+    }

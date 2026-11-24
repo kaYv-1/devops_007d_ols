@@ -10,8 +10,8 @@ Microservicio HTTP nativo de Node.js, sin dependencias externas. Expone:
 - Otras rutas: responden `404`.
 
 Las solicitudes generan logs JSON con timestamp, método, ruta, código de respuesta,
-duración e identificador de correlación `X-Request-ID`. El endpoint `/metrics` está
-preparado para ser recolectado por Prometheus en la siguiente fase de observabilidad.
+duración e identificador de correlación `X-Request-ID`. El endpoint `/metrics`
+expone solicitudes, errores, latencia y métricas del proceso para Prometheus.
 
 ## Pipeline CI/CD
 
@@ -38,6 +38,7 @@ flowchart LR
 - `security`: depende de `test`; analiza dependencias y código con Snyk y ejecuta Trivy sobre el filesystem. Detecciones `HIGH`/`CRITICAL` bloquean los jobs siguientes.
 - `build-scan-push`: solo en push a `main`; construye la imagen con etiquetas OCI, la escanea con Trivy y la publica en GHCR bajo el SHA corto del commit.
 - `deploy`: solo después de publicar la imagen; selecciona el entorno GitHub `staging`, descarga esa misma imagen por SHA, la levanta con Compose y ejecuta un smoke test HTTP.
+- `deploy-aks`: despliega en Azure Kubernetes Service, instala Prometheus/Grafana y aplica ServiceMonitor, reglas de alerta y dashboard.
 - `alert`: abre un issue automático en GitHub si falla un job previo en un push.
 
 Los jobs `build-scan-push` y `deploy` solo corren en push a `main`; los jobs `test` y `security` corren para todos los pushes y para pull requests dirigidos a `main`.
@@ -92,6 +93,14 @@ recursos, ejecución no root y anotaciones de scraping para `/metrics`.
 El workflow ejecuta el job `deploy-aks` cuando la variable de repositorio
 `AKS_ENABLED` vale `true`. La configuración de Azure, OIDC, GHCR y el smoke
 test está documentada en [`docs/kubernetes-aks.md`](docs/kubernetes-aks.md).
+
+### Observabilidad en AKS
+
+La fase de observabilidad instala `kube-prometheus-stack` y configura:
+
+- Prometheus para recopilar `/metrics` mediante [`k8s/servicemonitor.yaml`](k8s/servicemonitor.yaml).
+- Grafana con un LoadBalancer público y el dashboard incluido en [`k8s/grafana-dashboard.yaml`](k8s/grafana-dashboard.yaml).
+- Alertas para indisponibilidad, tasa alta de errores y latencia p95 en [`k8s/prometheus-rules.yaml`](k8s/prometheus-rules.yaml).
 
 ## Ejecución local
 
