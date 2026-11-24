@@ -111,6 +111,22 @@ Tomar las capturas personalmente, evitando mostrar secrets o tokens:
 3. **Fusión bloqueada por protección de `main`:** [CAPTURA 3]
 4. **Issue automático creado por el fallo del push:** [CAPTURA 4]
 
+### Verificación local de la rama de demostración
+
+Ejecutada el 2026-11-24 sobre el commit `b985348` de `demo/falla-critica`:
+
+| Comando | Resultado real |
+|---|---|
+| `trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 .` | Exit code 1; `package-lock.json`: 4 HIGH, 0 CRITICAL. Hallazgos `CVE-2020-8203`, `CVE-2021-23337`, `CVE-2026-4800` y `NSWG-ECO-516`. |
+| `npm.cmd audit` | Exit code 1; 1 vulnerabilidad HIGH para `lodash <=4.17.23`. |
+| `npm.cmd test` | 11/11 pruebas; cobertura de líneas 88.14%. |
+
+La falla local del escaneo Trivy confirma el bloqueo de la clase configurada en
+`security`; no equivale a una ejecución del workflow en GitHub. Snyk no se ejecutó
+localmente y la prueba de Actions/issue requiere publicar la rama con acceso al
+repositorio. El equipo debe completar las capturas numeradas tras la ejecución
+remota.
+
 ## Reflexiones individuales
 
 Las reflexiones individuales deben ser redactadas por los estudiantes, basadas
