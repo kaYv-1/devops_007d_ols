@@ -205,10 +205,17 @@ el resultado. Cita de la herramienta según la guía institucional:
 
 ### Reflexión EP3 de Angel
 
-(redactar sin IA)
+Durante el proyecto asumí la responsabilidad de la contenerización del microservicio y su arquitectura de ejecución, complementando el trabajo de automatización y calidad de mi compañero. Al diseñar el Dockerfile con construcción multistage, comprendí que separar las herramientas de prueba del entorno de producción no solo reduce el peso de la imagen, sino que disminuye drásticamente la superficie de ataque: al eliminar npm y binarios innecesarios en el runtime, evitamos que un eventual atacante pueda descargar dependencias maliciosas o escalar privilegios dentro del contenedor.
+
+En esta línea, enfrenté un problema concreto al llevar la imagen a Kubernetes: al configurar runAsNonRoot: true, el contenedor fallaba al iniciar porque USER node usa un nombre y no un identificador verificable por el kubelet. Tras revisar los manifiestos, lo resolví cambiando explícitamente a USER 1000:1000 en el Dockerfile (PR #55) y parché las vulnerabilidades del sistema base detectadas por Trivy antes de dar por cerrada la imagen.
+
+Al orquestar tres réplicas detrás de NGINX en Docker Compose, observé cómo se distribuyen las peticiones y entendí una diferencia clave entre entornos: mientras que en Compose el healthcheck con service_healthy solo condiciona el orden de arranque de NGINX, en la migración a AKS ese concepto evoluciona hacia los readinessProbe y livenessProbe, que sí sacan réplicas del balanceo en caliente si fallan, junto con los resources que protegen el clúster. Como limitación, reconozco que nuestra arquitectura local con NGINX y Compose es útil para validar el arranque, pero carece del autoescalado y la autorreparación real que hoy aporta AKS.
 
 ### Reflexión EP3 de Israel
 
-(redactar sin IA)
+En este proyecto me encargué de construir el flujo de integración continua, las pruebas automatizadas y los controles de seguridad en GitHub Actions, complementando la arquitectura de contenedores y despliegue de mi compañero. Al configurar el umbral mínimo del 80% de cobertura en Node.js, comprendí un matiz fundamental: la cobertura no garantiza la ausencia de bugs, sino que funciona como un piso de disciplina para asegurar que el código sea ejercitado, mientras que las aserciones de los tests son las que realmente validan el comportamiento. Asimismo, entendí el valor de combinar tres herramientas distintas en el pipeline: Snyk audita las dependencias de la aplicación, Trivy inspecciona vulnerabilidades en la imagen construida por mi compañero y SonarQube evalúa la calidad y mantenibilidad del código fuente.
 
+La mayor dificultad técnica ocurrió al integrar la cobertura con SonarQube, ya que el reporte no se importaba en los análisis. Tras revisar la configuración, identifiqué dos causas: el análisis automático de Sonar entraba en conflicto con el envío desde el pipeline, y las rutas SF: del archivo LCOV no coincidían con el entorno del runner, lo que resolví desactivando el análisis automático y normalizando las rutas en run-tests.js.
+
+Todo este flujo cobró sentido completo en EP3 al conectar la entrega con observabilidad y cumplimiento: la trazabilidad que logramos etiquetando las imágenes con el SHA del commit e incrustando las etiquetas OCI (org.opencontainers.image.revision) nos permite saber exactamente qué versión corre en AKS; el pipeline ahora bloquea despliegues ante vulnerabilidades críticas (como validamos con lodash), y las métricas de cobertura se envían vía Pushgateway para visualizarse en Grafana. Como mejora pendiente, noto que la validación con smoke tests sobre /health en el runner es efímera, por lo que el siguiente paso sería ejecutar pruebas de humo directamente contra el entorno desplegado antes de promover tráfico.
 
