@@ -62,13 +62,14 @@ El contenedor `tests` es un proceso de ejecución única, no un servidor HTTP. L
 
 ## Relación con los indicadores del PDF
 
-La pauta denomina los indicadores `IE1`–`IE5`, ponderados en 20% cada uno:
+La pauta denomina los indicadores `IE1`–`IE6`:
 
 - **IE1 — Contenedores:** imagen Node Alpine, construcción multistage y ejecución como usuario no root.
 - **IE2 — Pruebas automatizadas y calidad:** ejecución automática en CI; el umbral de cobertura de líneas de 80% falla el job si no se cumple.
 - **IE3 — Seguridad y escalabilidad:** Dependabot para npm, Docker y GitHub Actions; Snyk para dependencias y código; SonarQube Cloud para calidad de código; Trivy para filesystem e imagen; Compose con varias réplicas y límites de recursos; los fallos bloquean el pipeline y crean una alerta por issue.
 - **IE4 — Despliegue y trazabilidad:** publicación en GHCR etiquetada con SHA corto y labels OCI `revision`/`source`; despliegue de la misma etiqueta en `staging` y smoke test.
 - **IE5 — Orquestación:** Docker Compose coordina la aplicación, NGINX como proxy/balanceador y el servicio de pruebas. `APP_REPLICAS` configura las réplicas y el workflow aplica tres en staging.
+- **IE6 — Kubernetes, cumplimiento y bloqueo:** AKS ejecuta tres réplicas; Prometheus/Grafana muestran métricas y alertas; la auditoría automatizada y los escáneres bloquean el pipeline ante fallas.
 
 ## Política de calidad y seguridad
 
@@ -183,6 +184,7 @@ La rama de entrega es `main`. Todo el trabajo está integrado en esa rama y el r
 - [x] `SNYK_TOKEN` y `SONAR_TOKEN` configurados como secrets; el Environment `staging` creado; permisos de GHCR habilitados.
 - [x] Ejecución exitosa del workflow `CI/CD`: pruebas con cobertura de al menos 80%, análisis Snyk, Trivy y SonarQube Cloud, publicación de imagen en GHCR y despliegue con smoke test.
 - [x] Reflexión personal incluida en este README.
+- [x] Evidencia de ejecuciones, merges y verificaciones documentada en [docs/evidence.md](docs/evidence.md).
 
 ## Uso de herramientas de apoyo
 
