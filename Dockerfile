@@ -18,7 +18,7 @@ RUN apk upgrade --no-cache && \
 COPY --from=build --chown=node:node /app/package*.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/src ./src
-USER node
+USER 1000:1000
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -q -O - "http://127.0.0.1:${PORT:-3000}/health" >/dev/null 2>&1 || exit 1
 CMD ["node", "src/index.js"]
