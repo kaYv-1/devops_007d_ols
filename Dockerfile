@@ -1,4 +1,4 @@
-FROM node:24-alpine3.24 AS build
+FROM node:26-alpine3.24 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
@@ -10,7 +10,7 @@ COPY scripts ./scripts
 USER node
 CMD ["npm", "test"]
 
-FROM node:24-alpine3.24 AS runtime
+FROM node:26-alpine3.24 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk upgrade --no-cache && \
